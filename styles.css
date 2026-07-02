@@ -1,26 +1,33 @@
 /* ============================================================
-   Dünya Kupası Yol Haritası — editoryal açık tema
-   Zemin: kırık beyaz · Mürekkep: siyah · Tek vurgu: kırmızı
+   Dünya Kupası Yol Haritası ’26 — spor uygulaması koyu tema
+   Nötr koyu gri · temiz kartlar · yeşil vurgu · canlı kırmızı
    ============================================================ */
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  --paper: #f7f5f0;
-  --paper-2: #f0ede5;
-  --ink: #161513;
-  --ink-2: #4f4c45;
-  --ink-3: #8f8b80;
-  --rule: #dcd8cc;
-  --rule-strong: #161513;
-  --accent: #d6301f;
-  --accent-soft: #fbe9e6;
+  --bg: #0c0d0f;
+  --surface: #141518;
+  --surface-2: #1a1c20;
+  --surface-3: #212429;
+  --border: #26282e;
+  --border-strong: #34373f;
 
-  --font-display: "Anton", "Archivo", sans-serif;
-  --font-body: "Archivo", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --ink: #eceef1;
+  --muted: #9aa1ac;
+  --faint: #62676f;
 
-  --max: 1200px;
+  --accent: #2fd97c;
+  --accent-dim: rgb(47 217 124 / 0.12);
+  --live: #ff4e45;
+  --live-dim: rgb(255 78 69 / 0.12);
+  --draw: #e2b93b;
+
+  --font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --r: 12px;
+  --r-s: 8px;
 }
 
 * {
@@ -33,11 +40,11 @@ html {
 
 body {
   margin: 0;
-  background: var(--paper);
+  background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.5;
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -55,15 +62,16 @@ button {
   padding: 0;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 h1,
 h2,
 h3,
 p {
   margin: 0;
-}
-
-a {
-  color: inherit;
 }
 
 .sr-only {
@@ -79,318 +87,590 @@ a {
 }
 
 .wrap {
-  width: min(var(--max), 100% - 40px);
+  width: min(1280px, 100% - 32px);
   margin: 0 auto;
 }
 
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ============================================================
-   Masthead — gazete başlığı
+   Üst bar
    ============================================================ */
 
 .topbar {
-  border-bottom: 1px solid var(--rule);
-  background: var(--paper);
   position: sticky;
   top: 0;
-  z-index: 40;
+  z-index: 50;
+  background: rgb(12 13 15 / 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
 }
 
 .topbar-in {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 44px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-2);
+  gap: 14px;
+  min-height: 52px;
 }
 
-.topbar-left,
-.topbar-right {
-  display: flex;
+.brand {
+  display: inline-flex;
   align-items: center;
-  gap: 16px;
+  gap: 9px;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
-.topbar .live-flag {
+.brand-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.brand .yr {
+  color: var(--accent);
+}
+
+.topbar-live {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--live-dim);
+  color: var(--live);
+  font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 
 .live-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--accent);
-  animation: blink 1.4s steps(2, start) infinite;
+  background: var(--live);
+  animation: pulse 1.5s ease-out infinite;
 }
 
-@keyframes blink {
-  to { opacity: 0.25; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgb(255 78 69 / 0.45); }
+  75% { box-shadow: 0 0 0 6px rgb(255 78 69 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(255 78 69 / 0); }
 }
 
-.refresh-link {
-  font-family: var(--font-mono);
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.topbar-right .mono {
+  font-family: var(--mono);
   font-size: 12px;
   color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
-.refresh-link:hover {
-  color: var(--accent);
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-s);
+  background: var(--accent);
+  color: #08130c;
+  font-weight: 700;
+  font-size: 13px;
+  transition: filter 140ms ease;
 }
 
-.refresh-link:disabled {
-  color: var(--ink-3);
-  cursor: wait;
-  text-decoration: none;
+.refresh-btn:hover {
+  filter: brightness(1.1);
 }
 
-.masthead {
-  padding: 34px 0 0;
+.spin {
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
 }
 
-.masthead-kicker {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-}
-
-.masthead h1 {
-  margin-top: 10px;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(44px, 8.5vw, 104px);
-  line-height: 0.96;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-}
-
-.masthead h1 .yr {
-  color: var(--accent);
-}
-
-.masthead-sub {
-  margin-top: 14px;
-  padding-bottom: 18px;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 18px;
-  flex-wrap: wrap;
-  color: var(--ink-2);
-  font-size: 14px;
-}
-
-.masthead-sub .mono {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-}
-
-.double-rule {
-  border-top: 3px solid var(--rule-strong);
-  border-bottom: 1px solid var(--rule-strong);
-  height: 6px;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ============================================================
-   Bölüm başlıkları
+   Başlık bloğu
    ============================================================ */
 
-section {
-  padding: 34px 0 8px;
+.pagehead {
+  padding: 26px 0 4px;
 }
 
-.sec-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--rule-strong);
-  margin-bottom: 0;
+.pagehead h1 {
+  font-size: clamp(24px, 3.6vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
-.sec-head h2 {
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: -0.01em;
-  text-transform: uppercase;
-}
-
-.sec-head h2 .no {
-  font-family: var(--font-mono);
-  font-weight: 500;
+.pagehead h1 .yr {
   color: var(--accent);
-  margin-right: 10px;
-  font-size: 15px;
 }
 
-.sec-note {
-  font-family: var(--font-mono);
+.chip-row {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
   font-size: 12px;
-  color: var(--ink-3);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip.live {
+  color: var(--live);
+  border-color: rgb(255 78 69 / 0.35);
+  background: var(--live-dim);
+  font-weight: 700;
+}
+
+.chip.acc {
+  color: var(--accent);
+  border-color: rgb(47 217 124 / 0.35);
+  background: var(--accent-dim);
+  font-weight: 700;
+}
+
+.chip .mono {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
 }
 
 /* ============================================================
-   01 · Takvim şeridi
+   Kart temeli
+   ============================================================ */
+
+.grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.grid.cards-3 {
+  grid-template-columns: 1.25fr 1fr 0.95fr;
+}
+
+.grid.main-2 {
+  grid-template-columns: 1.45fr 1fr;
+  align-items: start;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.card-head h2::before {
+  content: "";
+  width: 4px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.card-note {
+  font-size: 11.5px;
+  color: var(--faint);
+  font-weight: 500;
+  text-align: right;
+}
+
+.card-note .live-txt {
+  color: var(--live);
+  font-weight: 700;
+}
+
+/* ============================================================
+   Turnuva verisi kartı (gol + kart birleşik)
+   ============================================================ */
+
+.stat-body {
+  padding: 16px;
+}
+
+.stat-hero {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.stat-hero strong {
+  font-size: 54px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-hero span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stat-mini-row {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--border);
+}
+
+.stat-mini {
+  padding: 12px 6px 2px 0;
+  border-right: 1px solid var(--border);
+}
+
+.stat-mini:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.stat-mini + .stat-mini {
+  padding-left: 12px;
+}
+
+.stat-mini .v {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.chipbox {
+  width: 9px;
+  height: 13px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.chipbox.y { background: var(--draw); }
+.chipbox.r { background: var(--live); }
+
+.stat-mini .k {
+  margin-top: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+}
+
+/* Gol krallığı */
+.list-pad {
+  padding: 6px 16px 10px;
+}
+
+.s-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.s-row:last-child {
+  border-bottom: 0;
+}
+
+.s-row .rk {
+  width: 16px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.s-row .nm {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.s-row .nm small {
+  display: block;
+  color: var(--faint);
+  font-weight: 500;
+  font-size: 11.5px;
+}
+
+.s-row .g {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Sıradaki maç kartı */
+.next-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.next-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.next-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.next-team .flag {
+  width: 42px;
+  height: 30px;
+  border-radius: 4px;
+}
+
+.next-vs {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--faint);
+  font-weight: 700;
+}
+
+.next-count {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.next-count .mono {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.next-sub {
+  font-size: 11.5px;
+  color: var(--faint);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   Takvim şeridi
    ============================================================ */
 
 .timeline {
   display: flex;
   overflow-x: auto;
-  border-left: 1px solid var(--rule);
-  scrollbar-width: thin;
   scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 .day {
-  flex: 0 0 148px;
-  min-height: 176px;
-  padding: 12px 12px 14px;
-  border-right: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
+  flex: 0 0 138px;
+  min-height: 158px;
+  padding: 12px;
+  border-right: 1px solid var(--border);
 }
 
-.day.today {
-  background: var(--ink);
-  color: var(--paper);
+.day:last-child {
+  border-right: 0;
 }
 
 .day.past {
-  background: var(--paper-2);
+  background: rgb(0 0 0 / 0.22);
+}
+
+.day.today {
+  background: var(--accent-dim);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 
 .day-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .day-num {
-  font-family: var(--font-display);
-  font-size: 30px;
+  font-size: 22px;
+  font-weight: 800;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .day-wd {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  color: var(--ink-3);
+  letter-spacing: 0.06em;
+  color: var(--faint);
 }
 
 .day.today .day-wd {
   color: var(--accent);
-  font-weight: 700;
 }
 
 .day-month {
-  margin-top: 2px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
+  margin-top: 1px;
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-3);
+  letter-spacing: 0.08em;
+  color: var(--faint);
 }
 
 .day-matches {
-  margin-top: 10px;
+  margin-top: 9px;
   display: grid;
-  gap: 4px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  line-height: 1.4;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .day-match {
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--ink-2);
-}
-
-.day.today .day-match {
-  color: rgb(247 245 240 / 0.82);
 }
 
 .day-match .s {
-  font-weight: 700;
   color: var(--ink);
-}
-
-.day.today .day-match .s {
-  color: var(--paper);
+  font-weight: 700;
 }
 
 .day-match.live-m,
 .day-match.live-m .s {
-  color: var(--accent);
+  color: var(--live);
   font-weight: 700;
 }
 
-.day-more {
-  color: var(--ink-3);
+.day-more,
+.day-empty {
+  color: var(--faint);
   font-size: 10.5px;
 }
 
 .day-empty {
-  margin-top: 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-3);
+  margin-top: 9px;
+  font-family: var(--mono);
 }
 
 /* ============================================================
-   02 · Şampiyonluk yolu (bracket)
+   Şampiyonluk yolu (bracket)
    ============================================================ */
 
 .bracket {
   display: flex;
   overflow-x: auto;
-  border-left: 1px solid var(--rule);
-  padding-bottom: 6px;
   scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 .round-col {
-  flex: 0 0 236px;
-  border-right: 1px solid var(--rule);
+  flex: 0 0 228px;
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
 
+.round-col:last-child {
+  border-right: 0;
+}
+
 .round-title {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--rule);
-  font-family: var(--font-mono);
-  font-size: 11.5px;
+  position: sticky;
+  top: 0;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--ink-2);
+  letter-spacing: 0.09em;
+  color: var(--muted);
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
   gap: 8px;
 }
 
 .round-title .cnt {
-  color: var(--ink-3);
-  font-weight: 400;
+  color: var(--faint);
+  font-family: var(--mono);
 }
 
 .round-body {
@@ -403,28 +683,29 @@ section {
 }
 
 .tie {
-  border: 1px solid var(--rule);
-  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  background: var(--surface-2);
+  overflow: hidden;
 }
 
 .tie.live-tie {
-  border-color: var(--accent);
+  border-color: rgb(255 78 69 / 0.5);
 }
 
 .tie-meta {
-  padding: 5px 10px 4px;
-  border-bottom: 1px solid var(--rule);
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-family: var(--font-mono);
+  font-family: var(--mono);
   font-size: 10px;
-  color: var(--ink-3);
-  text-transform: uppercase;
+  color: var(--faint);
 }
 
 .tie.live-tie .tie-meta {
-  color: var(--accent);
+  color: var(--live);
   font-weight: 700;
 }
 
@@ -432,11 +713,11 @@ section {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 7px 10px;
 }
 
 .tie-row + .tie-row {
-  border-top: 1px dotted var(--rule);
+  border-top: 1px solid var(--border);
 }
 
 .tie-row .flag {
@@ -450,605 +731,500 @@ section {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .tie-row.winner .nm {
-  font-weight: 700;
+  font-weight: 800;
+}
+
+.tie-row.winner .sc {
+  color: var(--accent);
 }
 
 .tie-row.loser {
-  color: var(--ink-3);
+  opacity: 0.55;
 }
 
 .tie-row .sc {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-family: var(--mono);
+  font-size: 12.5px;
   font-weight: 700;
-  min-width: 18px;
+  min-width: 16px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .tie-row.tbd {
-  color: var(--ink-3);
+  color: var(--faint);
 }
 
 .tie-row.tbd .nm {
-  font-weight: 400;
-  font-style: italic;
-  font-size: 12.5px;
+  font-weight: 500;
+  font-size: 12px;
 }
 
 .tbd-flag {
   width: 22px;
   height: 15px;
   flex: 0 0 auto;
-  border: 1px dashed var(--rule);
-  background: var(--paper-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface);
 }
 
 /* ============================================================
-   03 · Takımını takip et
+   Maç merkezi
    ============================================================ */
 
-.follow-bar {
+.mc-tools {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   flex-wrap: wrap;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--rule);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
 }
 
-.follow-bar label {
-  font-family: var(--font-mono);
+.mc-tab {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
   font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-2);
+  font-weight: 600;
+  transition: all 130ms ease;
 }
 
-.follow-bar select {
-  border: 1px solid var(--rule-strong);
-  background: #fff;
-  padding: 8px 12px;
-  min-width: 220px;
-  border-radius: 0;
-  outline-offset: 2px;
+.mc-tab:hover {
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+
+.mc-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #08130c;
+  font-weight: 700;
+}
+
+.mc-search {
+  flex: 1 1 120px;
+  min-width: 110px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 12.5px;
+  outline: none;
+}
+
+.mc-search:focus {
+  border-color: rgb(47 217 124 / 0.5);
+}
+
+.mc-search::placeholder {
+  color: var(--faint);
+}
+
+.match-list {
+  max-height: 720px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.m-item {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background-color 130ms ease;
+}
+
+.m-item:hover {
+  background: var(--surface-2);
+}
+
+.m-item:last-child {
+  border-bottom: 0;
+}
+
+.m-item.live-m {
+  box-shadow: inset 3px 0 0 var(--live);
+  background: rgb(255 78 69 / 0.04);
+}
+
+.m-when {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  line-height: 1.35;
+}
+
+.m-when .big {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.m-when.live .big {
+  color: var(--live);
+}
+
+.m-teams {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.m-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.m-line .flag {
+  width: 22px;
+  height: 15px;
+}
+
+.m-line .nm {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.m-line.winner .nm {
+  font-weight: 800;
+}
+
+.m-line.loser {
+  opacity: 0.55;
+}
+
+.m-line .g {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  font-weight: 700;
+  min-width: 14px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-line.winner .g {
+  color: var(--accent);
+}
+
+.m-item.live-m .g {
+  color: var(--ink);
+}
+
+.m-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--faint);
+  text-align: right;
+  max-width: 92px;
+  line-height: 1.4;
+}
+
+.m-goals {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 14px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--border);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.m-teams.goal-flash {
+  animation: goal-flash 1.3s ease-out;
+  border-radius: 6px;
+}
+
+@keyframes goal-flash {
+  0% { background: var(--accent-dim); box-shadow: 0 0 0 4px var(--accent-dim); }
+  100% { background: transparent; box-shadow: none; }
+}
+
+.m-empty {
+  padding: 26px 16px;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+/* ============================================================
+   Takımını takip et
+   ============================================================ */
+
+.follow-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.follow-tools label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.follow-tools select {
+  min-height: 36px;
+  min-width: 210px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  background: var(--surface-2);
+  color: var(--ink);
+  outline: none;
+}
+
+.follow-tools select:focus {
+  border-color: rgb(47 217 124 / 0.5);
 }
 
 .follow-clear {
-  font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--ink-3);
+  color: var(--faint);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 .follow-clear:hover {
-  color: var(--accent);
-}
-
-.follow-panel {
-  border-bottom: 1px solid var(--rule);
+  color: var(--live);
 }
 
 .follow-id {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 18px 0 4px;
+  gap: 12px;
   flex-wrap: wrap;
+  padding: 14px 16px 0;
 }
 
 .follow-id .flag {
-  width: 46px;
-  height: 32px;
+  width: 38px;
+  height: 27px;
+  border-radius: 4px;
 }
 
 .follow-id h3 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 34px;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .follow-tags {
+  margin-left: auto;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-left: auto;
 }
 
 .tag {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border: 1px solid var(--rule-strong);
-  padding: 4px 9px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .tag.acc {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
+  color: var(--accent);
+  border-color: rgb(47 217 124 / 0.35);
+  background: var(--accent-dim);
+  font-weight: 700;
 }
 
 .tag.red {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
+  color: var(--live);
+  border-color: rgb(255 78 69 / 0.35);
+  background: var(--live-dim);
+  font-weight: 700;
 }
 
 .follow-road {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  border-left: 1px solid var(--rule);
-  border-top: 1px solid var(--rule);
-  margin: 16px 0 20px;
+  grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+  gap: 10px;
+  padding: 14px 16px 16px;
 }
 
 .road-step {
-  border-right: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  padding: 12px 14px;
-  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  background: var(--surface-2);
+  padding: 11px 13px;
 }
 
 .road-step.next {
-  background: var(--accent-soft);
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+  border-color: rgb(47 217 124 / 0.55);
+  background: var(--accent-dim);
 }
 
 .road-step-round {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-family: var(--font-mono);
   font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-3);
-}
-
-.road-step-round .res {
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
 }
 
-.res.w { color: #1d7a3e; }
-.res.d { color: #a07a1a; }
-.res.l { color: var(--accent); }
+.res.w { color: var(--accent); }
+.res.d { color: var(--draw); }
+.res.l { color: var(--live); }
 
 .road-step-line {
-  margin-top: 8px;
+  margin-top: 9px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
 }
 
+.road-step-line .flag {
+  width: 22px;
+  height: 15px;
+}
+
 .road-step-line .sc {
-  font-family: var(--font-mono);
-  font-weight: 700;
   margin-left: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 .road-step-sub {
-  margin-top: 6px;
-  font-family: var(--font-mono);
+  margin-top: 7px;
   font-size: 11px;
-  color: var(--ink-3);
+  color: var(--faint);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .follow-empty {
-  padding: 22px 0;
-  color: var(--ink-3);
-  font-size: 14px;
+  padding: 18px 16px;
+  color: var(--faint);
+  font-size: 13px;
 }
 
 /* ============================================================
-   04 · Maç merkezi
-   ============================================================ */
-
-.mc-head-tools {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
-}
-
-.mc-tabs {
-  display: flex;
-  gap: 0;
-}
-
-.mc-tab {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 6px 12px;
-  border: 1px solid var(--rule-strong);
-  border-right: 0;
-  color: var(--ink-2);
-  background: #fff;
-}
-
-.mc-tab:last-child {
-  border-right: 1px solid var(--rule-strong);
-}
-
-.mc-tab.active {
-  background: var(--ink);
-  color: var(--paper);
-}
-
-.mc-search {
-  border: 1px solid var(--rule-strong);
-  background: #fff;
-  padding: 6px 12px;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  width: 190px;
-  border-radius: 0;
-  outline-offset: 2px;
-}
-
-.match-table {
-  border-left: 1px solid var(--rule);
-  border-right: 1px solid var(--rule);
-}
-
-.m-row {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr) 84px minmax(0, 1fr) 130px;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--rule);
-  background: #fff;
-}
-
-.m-row.live-m {
-  background: var(--accent-soft);
-}
-
-.m-status {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-.m-status.live {
-  color: var(--accent);
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.m-team {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.m-team.right {
-  justify-content: flex-end;
-  text-align: right;
-}
-
-.m-team .nm {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.m-score {
-  font-family: var(--font-mono);
-  font-size: 16px;
-  font-weight: 700;
-  text-align: center;
-  padding: 4px 0;
-}
-
-.m-score.goal-flash {
-  animation: goal-flash 1.2s ease-out;
-}
-
-@keyframes goal-flash {
-  0% { background: var(--accent); color: #fff; }
-  100% { background: transparent; color: inherit; }
-}
-
-.m-stage {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  text-align: right;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.m-goals {
-  grid-column: 1 / -1;
-  padding-top: 6px;
-  border-top: 1px dotted var(--rule);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 18px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--ink-2);
-}
-
-.m-empty {
-  padding: 26px 14px;
-  border-bottom: 1px solid var(--rule);
-  background: #fff;
-  color: var(--ink-3);
-  font-size: 14px;
-}
-
-/* ============================================================
-   05 · Turnuva verisi (tek kart) + gol krallığı
-   ============================================================ */
-
-.data-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-  border: 1px solid var(--rule-strong);
-  background: #fff;
-}
-
-.stat-card {
-  padding: 22px 24px 24px;
-  border-right: 1px solid var(--rule-strong);
-}
-
-.stat-kicker {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--ink-2);
-}
-
-.stat-hero {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-top: 6px;
-}
-
-.stat-hero strong {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(64px, 8vw, 96px);
-  line-height: 1;
-  letter-spacing: 0.01em;
-}
-
-.stat-hero span {
-  font-size: 14px;
-  color: var(--ink-2);
-}
-
-.stat-row {
-  margin-top: 18px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-top: 1px solid var(--rule-strong);
-}
-
-.stat-cell {
-  padding: 12px 4px 2px;
-  border-right: 1px solid var(--rule);
-}
-
-.stat-cell:last-child {
-  border-right: 0;
-}
-
-.stat-cell .v {
-  font-family: var(--font-mono);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.stat-cell .v .chip {
-  display: inline-block;
-  width: 10px;
-  height: 14px;
-  margin-right: 7px;
-  vertical-align: -1px;
-}
-
-.chip.y { background: #e2b93b; }
-.chip.r { background: var(--accent); }
-
-.stat-cell .k {
-  margin-top: 3px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-3);
-}
-
-.scorers {
-  padding: 22px 24px 18px;
-}
-
-.scorer-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dotted var(--rule);
-}
-
-.scorer-line:last-child {
-  border-bottom: 0;
-}
-
-.scorer-line .rk {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-3);
-  width: 16px;
-}
-
-.scorer-line .flag {
-  width: 24px;
-  height: 17px;
-}
-
-.scorer-line .nm {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-  font-size: 13.5px;
-}
-
-.scorer-line .nm small {
-  display: block;
-  font-weight: 400;
-  color: var(--ink-3);
-  font-size: 11.5px;
-}
-
-.scorer-line .g {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 15px;
-}
-
-/* ============================================================
-   06 · Gruplar (arşiv)
+   Gruplar
    ============================================================ */
 
 .groups {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 0;
-  border-top: 1px solid var(--rule);
-  border-left: 1px solid var(--rule);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
 }
 
-.group-block {
-  border-right: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-  background: #fff;
-  padding: 14px 16px 10px;
-}
-
-.group-block h3 {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--ink-2);
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--rule-strong);
-}
-
-.g-table {
+.group-card table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
-  margin-top: 2px;
+  font-size: 12.5px;
 }
 
-.g-table td {
-  padding: 6px 4px;
-  border-bottom: 1px dotted var(--rule);
+.group-card td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
 
-.g-table tr:last-child td {
+.group-card tr:last-child td {
   border-bottom: 0;
 }
 
-.g-table .r {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-3);
-  width: 16px;
+.group-card tr.q {
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.g-table .t {
+.group-card .r {
+  width: 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.group-card .t {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.g-table .t .nm {
+.group-card .t .flag {
+  width: 22px;
+  height: 15px;
+}
+
+.group-card .t .nm {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.g-table .n {
-  font-family: var(--font-mono);
-  font-size: 12px;
+.group-card .n {
+  font-family: var(--mono);
+  font-size: 11.5px;
   text-align: right;
   white-space: nowrap;
+  color: var(--muted);
 }
 
-.g-table .p {
+.group-card .p {
   font-weight: 700;
-}
-
-.g-table tr.q td {
-  background: transparent;
-}
-
-.g-table tr.q .nm::after {
-  content: "•";
-  color: var(--accent);
-  margin-left: 6px;
+  color: var(--ink);
 }
 
 /* ============================================================
-   Bayrak
+   Bayrak / uyarı / footer
    ============================================================ */
 
 .flag {
-  width: 26px;
-  height: 18px;
+  width: 24px;
+  height: 17px;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: var(--paper-2);
-  outline: 1px solid rgb(22 21 19 / 0.14);
-  color: var(--ink-3);
-  font-family: var(--font-mono);
-  font-size: 8px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  outline: 1px solid rgb(255 255 255 / 0.09);
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 7.5px;
   font-weight: 700;
 }
 
@@ -1059,46 +1235,49 @@ section {
   display: block;
 }
 
-/* ============================================================
-   Uyarı / hata / footer
-   ============================================================ */
-
 .notice {
-  margin-top: 18px;
-  border: 1px solid var(--accent);
-  background: var(--accent-soft);
-  padding: 12px 16px;
-  font-size: 13.5px;
+  margin-top: 14px;
+  border: 1px solid rgb(226 185 59 / 0.4);
+  border-radius: var(--r-s);
+  background: rgb(226 185 59 / 0.08);
+  color: var(--draw);
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .error-box {
-  width: min(720px, 100% - 40px);
-  margin: 80px auto;
-  border: 1px solid var(--accent);
-  background: var(--accent-soft);
-  padding: 24px;
+  width: min(640px, 100% - 32px);
+  margin: 90px auto;
+  border: 1px solid rgb(255 78 69 / 0.4);
+  border-radius: var(--r);
+  background: var(--live-dim);
+  padding: 22px;
 }
 
-.error-box .refresh-link {
-  margin-top: 10px;
-  display: inline-block;
+.error-box .refresh-btn {
+  margin-top: 14px;
 }
 
 .site-footer {
-  margin-top: 46px;
-  border-top: 3px solid var(--rule-strong);
-  padding: 16px 0 40px;
+  margin: 30px 0 40px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--ink-3);
+  font-size: 12px;
+  color: var(--faint);
 }
 
 .site-footer a {
-  color: var(--ink-2);
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: var(--ink);
 }
 
 /* ============================================================
@@ -1106,23 +1285,31 @@ section {
    ============================================================ */
 
 .skeleton {
-  width: min(var(--max), 100% - 40px);
+  min-height: 100vh;
+}
+
+.sk-wrap {
+  width: min(1280px, 100% - 32px);
   margin: 0 auto;
-  padding-top: 12px;
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .sk {
   position: relative;
   overflow: hidden;
-  background: var(--paper-2);
-  margin-bottom: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
 }
 
 .sk::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.75) 50%, transparent 70%);
+  background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.05) 50%, transparent 70%);
   transform: translateX(-100%);
   animation: shimmer 1.5s ease-in-out infinite;
 }
@@ -1131,64 +1318,49 @@ section {
   to { transform: translateX(100%); }
 }
 
-.sk-bar { height: 28px; width: 46%; }
-.sk-title { height: 92px; width: 82%; }
-.sk-rule { height: 6px; width: 100%; background: var(--rule); }
-.sk-strip { height: 170px; }
-.sk-block { height: 300px; }
-.sk-block.short { height: 180px; }
+.sk-top { height: 52px; border-radius: 0; border-left: 0; border-right: 0; border-top: 0; }
+.sk-head { height: 96px; }
+.sk-card { height: 170px; flex: 1; }
+.sk-strip { height: 168px; }
+.sk-panel { height: 430px; }
+
+.sk-row {
+  display: flex;
+  gap: 14px;
+}
+
+.sk-row.main .sk-panel:first-child { flex: 1.45; }
+.sk-row.main .sk-panel:last-child { flex: 1; }
 
 /* ============================================================
    Duyarlılık
    ============================================================ */
 
-@media (max-width: 900px) {
-  .data-grid {
-    grid-template-columns: 1fr;
-  }
-  .stat-card {
-    border-right: 0;
-    border-bottom: 1px solid var(--rule-strong);
-  }
-  .m-row {
-    grid-template-columns: 70px minmax(0, 1fr) 66px minmax(0, 1fr);
-  }
-  .m-stage {
-    display: none;
-  }
+@media (max-width: 1024px) {
+  .grid.cards-3 { grid-template-columns: 1fr 1fr; }
+  .grid.cards-3 .card:first-child { grid-column: 1 / -1; }
+  .grid.main-2 { grid-template-columns: 1fr; }
+  .groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
-  body {
-    font-size: 14px;
-  }
-  .wrap,
-  .skeleton {
-    width: calc(100% - 28px);
-  }
-  .topbar-left span.hide-s,
-  .topbar-right span.hide-s {
-    display: none;
-  }
-  .m-row {
-    grid-template-columns: minmax(0, 1fr) 60px minmax(0, 1fr);
-    grid-template-areas: "st st st" "h s a" "g g g";
-  }
-  .m-status { grid-area: st; }
-  .m-team { grid-area: h; }
-  .m-score { grid-area: s; }
-  .m-team.right { grid-area: a; }
-  .m-goals { grid-area: g; }
-  .mc-search { width: 100%; }
-  .stat-row { grid-template-columns: repeat(2, 1fr); }
-  .stat-cell:nth-child(2) { border-right: 0; }
-  .stat-cell { padding-bottom: 12px; }
+  .wrap { width: calc(100% - 24px); }
+  .grid.cards-3 { grid-template-columns: 1fr; }
+  .groups { grid-template-columns: 1fr; }
+  .topbar-right .hide-s { display: none; }
+  .stat-mini-row { grid-template-columns: repeat(2, 1fr); }
+  .stat-mini:nth-child(2) { border-right: 0; }
+  .stat-mini:nth-child(3) { padding-left: 0; }
+  .stat-mini { padding-bottom: 10px; }
+  .m-tag { display: none; }
+  .m-item { grid-template-columns: 52px minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .live-dot { animation: none; }
   .sk::after { animation: none; }
-  .m-score.goal-flash { animation: none; }
+  .m-teams.goal-flash { animation: none; }
+  .spin { animation: none; }
   .timeline { scroll-behavior: auto; }
 }

@@ -3,22 +3,22 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Dünya Kupası Yol Haritası · 2026</title>
+    <title>Dünya Kupası Yol Haritası ’26 — Canlı</title>
     <meta
       name="description"
-      content="2026 FIFA Dünya Kupası yol haritası: takvim, şampiyonluk yolu, canlı skorlar ve turnuva verileri. 10 saniyede bir otomatik güncellenir."
+      content="2026 FIFA Dünya Kupası yol haritası: takvim, şampiyonluk yolu, canlı skorlar, takım takibi ve turnuva verileri. 10 saniyede bir güncellenir."
     />
-    <meta name="theme-color" content="#f7f5f0" />
-    <meta property="og:title" content="Dünya Kupası Yol Haritası · 2026" />
+    <meta name="theme-color" content="#0c0d0f" />
+    <meta property="og:title" content="Dünya Kupası Yol Haritası ’26 — Canlı" />
     <meta
       property="og:description"
-      content="Son 32'den finale: turnuvanın tamamı tek sayfada, canlı."
+      content="Son 32'den finale: turnuvanın tamamı tek ekranda, canlı."
     />
     <link rel="icon" href="./favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
@@ -26,12 +26,20 @@
   <body>
     <div id="app">
       <div class="skeleton" aria-hidden="true">
-        <div class="sk sk-bar"></div>
-        <div class="sk sk-title"></div>
-        <div class="sk sk-rule"></div>
-        <div class="sk sk-strip"></div>
-        <div class="sk sk-block"></div>
-        <div class="sk sk-block short"></div>
+        <div class="sk sk-top"></div>
+        <div class="sk-wrap">
+          <div class="sk sk-head"></div>
+          <div class="sk-row">
+            <div class="sk sk-card"></div>
+            <div class="sk sk-card"></div>
+            <div class="sk sk-card"></div>
+          </div>
+          <div class="sk sk-strip"></div>
+          <div class="sk-row main">
+            <div class="sk sk-panel"></div>
+            <div class="sk sk-panel"></div>
+          </div>
+        </div>
       </div>
       <p class="sr-only" role="status">Veriler yükleniyor</p>
     </div>
