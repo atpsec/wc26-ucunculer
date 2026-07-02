@@ -1,6 +1,6 @@
 /* ============================================================
-   WC26 · En İyi Üçüncüler — canlı veri + koyu tema arayüz
-   Veri: ESPN public API (10 sn'de bir yenilenir)
+   Dünya Kupası Yol Haritası · 2026
+   Veri: ESPN public API — 10 saniyede bir otomatik yenilenir
    ============================================================ */
 
 const ESPN_SCOREBOARD_URL =
@@ -16,6 +16,9 @@ const ESPN_STANDINGS_URL =
 
 const GROUP_ORDER = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
 const REFRESH_SECONDS = 10;
+const TOURNAMENT_START = "2026-06-11";
+const TOURNAMENT_END = "2026-07-19";
+const FOLLOW_STORAGE_KEY = "wc26-followed-team";
 
 const TEAM_FLAG_CODES = {
   algeria: "dz",
@@ -97,18 +100,32 @@ const TEAM_FLAG_CODES = {
   wales: "gb-wls",
 };
 
+const ROUND_ORDER = [
+  { key: "r32", label: "Son 32" },
+  { key: "r16", label: "Son 16" },
+  { key: "qf", label: "Çeyrek Final" },
+  { key: "sf", label: "Yarı Final" },
+  { key: "final", label: "Final" },
+];
+
 const state = {
   data: null,
   loading: true,
   refreshing: false,
   error: null,
-  matchFilter: "live",
+  matchFilter: "today",
   matchQuery: "",
-  selectedGroup: "all",
+  followedTeam: null,
   firstRenderDone: false,
+  timelineScrolled: false,
 };
 
-// Gol flaşı için önceki skorlar (matchId -> "h-a")
+try {
+  state.followedTeam = window.localStorage.getItem(FOLLOW_STORAGE_KEY) || null;
+} catch {
+  /* storage kapalıysa takip özelliği oturumla sınırlı kalır */
+}
+
 let previousScores = new Map();
 
 const app = document.querySelector("#app");
@@ -122,6 +139,14 @@ const timeFormatter = new Intl.DateTimeFormat("tr-TR", {
   hour: "2-digit",
   minute: "2-digit",
 });
+const longDateFormatter = new Intl.DateTimeFormat("tr-TR", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  weekday: "long",
+});
+const weekdayFormatter = new Intl.DateTimeFormat("tr-TR", { weekday: "short" });
+const monthFormatter = new Intl.DateTimeFormat("tr-TR", { month: "long" });
 
 /* ============================================================
    Yardımcılar
@@ -165,18 +190,6 @@ function getFlagUrl(flagCode) {
   return flagCode ? `https://flagcdn.com/w80/${flagCode.toLowerCase()}.png` : null;
 }
 
-function withTeamVisuals(team) {
-  const name = String(team?.name ?? "").trim() || "Bilinmeyen takım";
-  const flagCode = getFlagCode(name);
-  return {
-    id: team?.id,
-    name,
-    logo: team?.logo ?? null,
-    flagCode,
-    flagUrl: getFlagUrl(flagCode),
-  };
-}
-
 function teamInitials(name) {
   return String(name)
     .split(/\s+/)
@@ -184,6 +197,23 @@ function teamInitials(name) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+}
+
+function withTeamVisuals(team) {
+  const name = String(team?.name ?? "").trim() || "Bilinmeyen takım";
+  const flagCode = getFlagCode(name);
+  return {
+    id: team?.id,
+    name,
+    abbr: team?.abbr ?? null,
+    logo: team?.logo ?? null,
+    flagCode,
+    flagUrl: getFlagUrl(flagCode),
+  };
+}
+
+function teamShort(team) {
+  return team.abbr ?? teamInitials(team.name);
 }
 
 function parseGroupLabel(value) {
@@ -225,65 +255,14 @@ function sortGroupRows(rows) {
   );
 }
 
-function compareThirdPlaceRows(first, second) {
+function teamName(team) {
   return (
-    second.points - first.points ||
-    second.goalDifference - first.goalDifference ||
-    second.goalsFor - first.goalsFor ||
-    (second.fairPlay ?? Number.NEGATIVE_INFINITY) -
-      (first.fairPlay ?? Number.NEGATIVE_INFINITY) ||
-    (first.fifaRank ?? Number.POSITIVE_INFINITY) -
-      (second.fifaRank ?? Number.POSITIVE_INFINITY) ||
-    first.team.name.localeCompare(second.team.name)
+    team?.displayName ?? team?.shortDisplayName ?? team?.location ?? team?.name ?? null
   );
 }
 
-function sortProjectedGroupRows(rows) {
-  return [...rows].sort(
-    (first, second) =>
-      second.points - first.points ||
-      second.goalDifference - first.goalDifference ||
-      second.goalsFor - first.goalsFor ||
-      second.won - first.won ||
-      first.team.name.localeCompare(second.team.name)
-  );
-}
-
-function rankThirdPlaceTeams(groups) {
-  return sortGroups(groups)
-    .map((group) => sortGroupRows(group.rows).find((row) => row.rank === 3))
-    .filter(Boolean)
-    .sort(compareThirdPlaceRows)
-    .map((row, index) => ({
-      ...row,
-      thirdRank: index + 1,
-      qualification: index < 7 ? "inside" : index === 7 ? "edge" : "outside",
-    }));
-}
-
-function findNextKickoff(matches) {
-  const now = Date.now();
-  return (
-    matches
-      .filter((match) => !match.isFinished && Date.parse(match.date) >= now)
-      .sort((first, second) => Date.parse(first.date) - Date.parse(second.date))[0] ??
-    null
-  );
-}
-
-function mergeScoreboards(...payloads) {
-  const eventsById = new Map();
-  for (const payload of payloads) {
-    for (const event of payload?.events ?? []) {
-      const key =
-        event.id ??
-        `${event.date ?? "unknown"}-${event.name ?? ""}-${
-          event.competitions?.[0]?.id ?? ""
-        }`;
-      eventsById.set(key, event);
-    }
-  }
-  return { events: [...eventsById.values()] };
+function teamLogo(team) {
+  return team?.logo ?? team?.logos?.find((logo) => logo.href)?.href ?? null;
 }
 
 function statValue(stats, name, fallback = 0) {
@@ -295,15 +274,6 @@ function statValue(stats, name, fallback = 0) {
   return typeof stat?.value === "number" && Number.isFinite(stat.value)
     ? stat.value
     : fallback;
-}
-
-function statSummary(stats, name) {
-  const stat = stats?.find(
-    (item) =>
-      item.name?.toLowerCase() === name.toLowerCase() ||
-      item.type?.toLowerCase() === name.toLowerCase()
-  );
-  return stat?.summary ?? stat?.displayValue ?? null;
 }
 
 function leaderStatValue(stats, name, fallback = null) {
@@ -332,14 +302,19 @@ function topScorerNameTeamKey(playerName, team) {
   return `name:${normalizeTeamName(playerName)}|team:${normalizeTeamName(team)}`;
 }
 
-function teamName(team) {
-  return (
-    team?.displayName ?? team?.shortDisplayName ?? team?.location ?? team?.name ?? null
-  );
-}
-
-function teamLogo(team) {
-  return team?.logo ?? team?.logos?.find((logo) => logo.href)?.href ?? null;
+function mergeScoreboards(...payloads) {
+  const eventsById = new Map();
+  for (const payload of payloads) {
+    for (const event of payload?.events ?? []) {
+      const key =
+        event.id ??
+        `${event.date ?? "unknown"}-${event.name ?? ""}-${
+          event.competitions?.[0]?.id ?? ""
+        }`;
+      eventsById.set(key, event);
+    }
+  }
+  return { events: [...eventsById.values()] };
 }
 
 /* ============================================================
@@ -363,7 +338,6 @@ function parseEspnStandings(payload) {
               statValue(entry.stats, "rank", entry.note?.rank ?? 0) ||
               entry.note?.rank ||
               0;
-            const summary = statSummary(entry.stats, "overall");
 
             return {
               group,
@@ -371,6 +345,7 @@ function parseEspnStandings(payload) {
               team: withTeamVisuals({
                 id: entry.team?.id,
                 name,
+                abbr: entry.team?.abbreviation ?? null,
                 logo: teamLogo(entry.team),
               }),
               played: statValue(entry.stats, "gamesPlayed"),
@@ -385,10 +360,6 @@ function parseEspnStandings(payload) {
                 goalsFor - goalsAgainst
               ),
               points: statValue(entry.stats, "points"),
-              form: summary ?? null,
-              fairPlay: null,
-              fifaRank: null,
-              description: entry.note?.description ?? null,
             };
           })
           .filter(Boolean);
@@ -407,90 +378,6 @@ function scoreValue(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function recordPlayed(summary) {
-  if (!summary) {
-    return null;
-  }
-  const parts = summary
-    .split("-")
-    .map((part) => Number(part.trim()))
-    .filter((part) => Number.isFinite(part));
-  return parts.length === 3 ? parts.reduce((total, part) => total + part, 0) : null;
-}
-
-function applyResult(row, goalsFor, goalsAgainst) {
-  const isWin = goalsFor > goalsAgainst;
-  const isDraw = goalsFor === goalsAgainst;
-  return {
-    ...row,
-    played: row.played + 1,
-    won: row.won + (isWin ? 1 : 0),
-    drawn: row.drawn + (isDraw ? 1 : 0),
-    lost: row.lost + (!isWin && !isDraw ? 1 : 0),
-    goalsFor: row.goalsFor + goalsFor,
-    goalsAgainst: row.goalsAgainst + goalsAgainst,
-    goalDifference: row.goalDifference + goalsFor - goalsAgainst,
-    points: row.points + (isWin ? 3 : isDraw ? 1 : 0),
-    description: "Canlı skor projeksiyonu",
-  };
-}
-
-function findTeamRow(rows, team) {
-  return rows.find(
-    (row) =>
-      (team.id !== undefined && String(row.team.id) === String(team.id)) ||
-      normalizeTeamName(row.team.name) === normalizeTeamName(team.name)
-  );
-}
-
-function applyLiveScoresToGroups(groups, matches) {
-  let applied = false;
-  const projectedGroups = groups.map((group) => ({
-    group: group.group,
-    rows: group.rows.map((row) => ({ ...row })),
-  }));
-
-  for (const match of matches) {
-    if (
-      !match.isLive ||
-      match.homeGoals === null ||
-      match.awayGoals === null ||
-      match.group === "-"
-    ) {
-      continue;
-    }
-    const group = projectedGroups.find((item) => item.group === match.group);
-    if (!group) {
-      continue;
-    }
-    const homeRow = findTeamRow(group.rows, match.home);
-    const awayRow = findTeamRow(group.rows, match.away);
-    const homePlayedBefore = recordPlayed(match.homeRecordSummary);
-    const awayPlayedBefore = recordPlayed(match.awayRecordSummary);
-    if (!homeRow || !awayRow) {
-      continue;
-    }
-    if (
-      homePlayedBefore !== null &&
-      awayPlayedBefore !== null &&
-      (homeRow.played > homePlayedBefore || awayRow.played > awayPlayedBefore)
-    ) {
-      continue;
-    }
-    const homeIndex = group.rows.indexOf(homeRow);
-    const awayIndex = group.rows.indexOf(awayRow);
-    group.rows[homeIndex] = applyResult(homeRow, match.homeGoals, match.awayGoals);
-    group.rows[awayIndex] = applyResult(awayRow, match.awayGoals, match.homeGoals);
-    group.rows = sortProjectedGroupRows(group.rows).map((row, index) => ({
-      ...row,
-      rank: index + 1,
-    }));
-    applied = true;
-  }
-
-  return { groups: sortGroups(projectedGroups), applied };
-}
-
 function goalEventsForMatch(details, match) {
   return (details ?? [])
     .filter((detail) => detail.scoringPlay || detail.type?.text === "Goal")
@@ -500,7 +387,6 @@ function goalEventsForMatch(details, match) {
       return {
         id: detail.id ?? `${match.id}-goal-${index}`,
         matchId: match.id,
-        group: match.group,
         minute: detail.clock?.displayValue ?? null,
         clockValue:
           typeof detail.clock?.value === "number" ? detail.clock.value : null,
@@ -510,15 +396,11 @@ function goalEventsForMatch(details, match) {
           detail.athletesInvolved?.[0]?.shortName ??
           detail.athletesInvolved?.[0]?.fullName ??
           null,
-        home: match.home,
-        away: match.away,
-        homeGoals: match.homeGoals,
-        awayGoals: match.awayGoals,
         isOwnGoal: detail.ownGoal,
         isPenalty: detail.penaltyKick,
       };
     })
-    .sort((first, second) => (second.clockValue ?? 0) - (first.clockValue ?? 0));
+    .sort((first, second) => (first.clockValue ?? 0) - (second.clockValue ?? 0));
 }
 
 function parseEspnMatches(payload) {
@@ -556,11 +438,6 @@ function parseEspnMatches(payload) {
           status?.type?.detail ??
           status?.type?.description ??
           stateName,
-        statusText:
-          status?.type?.detail ??
-          status?.type?.description ??
-          status?.type?.shortDetail ??
-          stateName,
         elapsed:
           typeof status?.clock === "number" && liveStates.has(stateName)
             ? Math.floor(status.clock / 60)
@@ -568,19 +445,25 @@ function parseEspnMatches(payload) {
         home: withTeamVisuals({
           id: home.team.id,
           name: teamName(home.team),
+          abbr: home.team.abbreviation ?? null,
           logo: teamLogo(home.team),
         }),
         away: withTeamVisuals({
           id: away.team.id,
           name: teamName(away.team),
+          abbr: away.team.abbreviation ?? null,
           logo: teamLogo(away.team),
         }),
         homeGoals: scoreValue(home.score),
         awayGoals: scoreValue(away.score),
+        homeShootout:
+          typeof home.shootoutScore === "number" ? home.shootoutScore : null,
+        awayShootout:
+          typeof away.shootoutScore === "number" ? away.shootoutScore : null,
+        homeWinner: home.winner === true,
+        awayWinner: away.winner === true,
         isLive: liveStates.has(stateName),
         isFinished: finishedStates.has(stateName) || Boolean(status?.type?.completed),
-        homeRecordSummary: home.records?.[0]?.summary ?? null,
-        awayRecordSummary: away.records?.[0]?.summary ?? null,
       };
 
       return {
@@ -589,22 +472,7 @@ function parseEspnMatches(payload) {
       };
     })
     .filter(Boolean)
-    .sort((first, second) => {
-      if (first.isLive !== second.isLive) {
-        return first.isLive ? -1 : 1;
-      }
-      return Date.parse(first.date) - Date.parse(second.date);
-    });
-}
-
-function isKnockoutRound(match) {
-  const label = `${match.round ?? ""} ${match.group ?? ""}`.toLowerCase();
-  return (
-    label.includes("round of") ||
-    label.includes("quarterfinal") ||
-    label.includes("semifinal") ||
-    label.includes("final")
-  );
+    .sort((first, second) => Date.parse(first.date) - Date.parse(second.date));
 }
 
 function isPlaceholderTeam(name) {
@@ -614,27 +482,52 @@ function isPlaceholderTeam(name) {
     normalized === "tbd" ||
     normalized === "tba" ||
     normalized.includes("to be decided") ||
-    /^group [a-l] (winner|2nd place|second place|runner up)$/.test(normalized) ||
+    normalized.includes("winner") ||
+    normalized.includes("runner up") ||
+    normalized.includes("2nd place") ||
+    normalized.includes("second place") ||
     normalized.startsWith("third place group") ||
-    /^round of (32|16) \d+ winner$/.test(normalized) ||
-    /^quarterfinals? \d+ winner$/.test(normalized) ||
-    /^semifinals? \d+ winner$/.test(normalized)
+    normalized.startsWith("group ")
   );
 }
 
-function findConfirmedMatchups(payload) {
-  return parseEspnMatches(payload)
-    .filter(
-      (match) =>
-        isKnockoutRound(match) &&
-        !isPlaceholderTeam(match.home.name) &&
-        !isPlaceholderTeam(match.away.name)
-    )
-    .sort((first, second) => Date.parse(first.date) - Date.parse(second.date));
+function roundKey(match) {
+  const label = String(match.round ?? match.group ?? "").toLowerCase();
+  if (label.includes("round of 32")) return "r32";
+  if (label.includes("round of 16")) return "r16";
+  if (label.includes("quarterfinal")) return "qf";
+  if (label.includes("semifinal")) return "sf";
+  if (label.includes("third place")) return null; // ana yolda gösterme
+  if (label.includes("final")) return "final";
+  return null;
 }
 
-function calculateTournamentStats(payload) {
-  const matches = parseEspnMatches(payload);
+function translateRound(value) {
+  const label = String(value ?? "").replace(/^FIFA World Cup,?\s*/i, "");
+  const table = [
+    [/round of 32/i, "Son 32"],
+    [/round of 16/i, "Son 16"],
+    [/quarterfinals?/i, "Çeyrek Final"],
+    [/semifinals?/i, "Yarı Final"],
+    [/third place/i, "Üçüncülük"],
+    [/final/i, "Final"],
+  ];
+  for (const [pattern, translated] of table) {
+    if (pattern.test(label)) {
+      return translated;
+    }
+  }
+  return label;
+}
+
+function stageLabel(match) {
+  if (/^[A-L]$/.test(match.group)) {
+    return `Grup ${match.group}`;
+  }
+  return translateRound(match.round ?? match.group ?? "");
+}
+
+function calculateTournamentStats(allMatches, payload) {
   const cardEvents = (payload.events ?? []).flatMap(
     (event) => event.competitions?.[0]?.details ?? []
   );
@@ -644,7 +537,7 @@ function calculateTournamentStats(payload) {
   const redCards = cardEvents.filter(
     (detail) => detail.redCard || detail.type?.text?.toLowerCase() === "red card"
   ).length;
-  const scoredMatches = matches.filter(
+  const scoredMatches = allMatches.filter(
     (match) =>
       (match.isFinished || match.isLive) &&
       match.homeGoals !== null &&
@@ -675,26 +568,22 @@ function parseTopScorers(payload) {
       const teamDisplayName = teamName(playerTeam);
       const stats = leaderStatistics(leader);
       const goals = leaderStatValue(stats, "totalGoals", leader.value ?? null) ?? 0;
-
       if (!playerName || !teamDisplayName) {
         return null;
       }
-
       return {
         rank: index + 1,
-        playerId: leader.athlete?.id,
         playerName,
         team: withTeamVisuals({
           id: playerTeam?.id,
           name: teamDisplayName,
+          abbr: playerTeam?.abbreviation ?? null,
           logo: teamLogo(playerTeam),
         }),
         goals,
         assists:
           leaderStatValue(stats, "goalAssists") ??
           parseAssistsFromDisplay(leader.shortDisplayValue),
-        appearances: leaderStatValue(stats, "appearances"),
-        headshotUrl: leader.athlete?.headshot?.href ?? null,
       };
     })
     .filter(Boolean);
@@ -710,25 +599,20 @@ function topScorerMetadata(payload) {
     const playerTeam = leader.athlete?.team;
     const teamDisplayName = teamName(playerTeam);
     const stats = leaderStatistics(leader);
-
     if (!playerName || !teamDisplayName) {
       continue;
     }
-
     const row = {
-      playerId: leader.athlete?.id,
       playerName,
       team: withTeamVisuals({
         id: playerTeam?.id,
         name: teamDisplayName,
+        abbr: playerTeam?.abbreviation ?? null,
         logo: teamLogo(playerTeam),
       }),
-      goals: leaderStatValue(stats, "totalGoals", leader.value ?? null) ?? 0,
       assists:
         leaderStatValue(stats, "goalAssists") ??
         parseAssistsFromDisplay(leader.shortDisplayValue),
-      appearances: leaderStatValue(stats, "appearances"),
-      headshotUrl: leader.athlete?.headshot?.href ?? null,
       statOrder: index,
     };
     metadata.set(topScorerKey(playerName, teamDisplayName, leader.athlete?.id), row);
@@ -775,19 +659,17 @@ function parseTopScorersFromScoreboard(payload, statsPayload) {
       const existing = scorers.get(key);
 
       scorers.set(key, {
-        playerId: athlete?.id ?? meta?.playerId,
         playerName: meta?.playerName ?? playerName,
         team:
           meta?.team ??
           withTeamVisuals({
             id: scoringTeam?.id ?? fallbackTeam?.id,
             name: scorerTeamName,
+            abbr: scoringTeam?.abbreviation ?? null,
             logo: teamLogo(scoringTeam) ?? teamLogo(fallbackTeam),
           }),
         goals: (existing?.goals ?? 0) + 1,
         assists: meta?.assists ?? existing?.assists ?? null,
-        appearances: meta?.appearances ?? existing?.appearances ?? null,
-        headshotUrl: meta?.headshotUrl ?? athlete?.headshot?.href ?? null,
         statOrder: meta?.statOrder ?? existing?.statOrder,
       });
     }
@@ -806,16 +688,21 @@ function parseTopScorersFromScoreboard(payload, statsPayload) {
     return parseTopScorers(statsPayload);
   }
 
-  return rows.slice(0, 5).map((row, index) => ({
-    rank: index + 1,
-    playerId: row.playerId,
-    playerName: row.playerName,
-    team: row.team,
-    goals: row.goals,
-    assists: row.assists,
-    appearances: row.appearances,
-    headshotUrl: row.headshotUrl,
-  }));
+  return rows.slice(0, 5).map((row, index) => ({ rank: index + 1, ...row }));
+}
+
+function buildBracket(allMatches) {
+  const rounds = new Map(ROUND_ORDER.map((round) => [round.key, []]));
+  for (const match of allMatches) {
+    const key = roundKey(match);
+    if (key && rounds.has(key)) {
+      rounds.get(key).push(match);
+    }
+  }
+  for (const list of rounds.values()) {
+    list.sort((first, second) => Date.parse(first.date) - Date.parse(second.date));
+  }
+  return rounds;
 }
 
 function normalizeEspnPayload(
@@ -826,47 +713,29 @@ function normalizeEspnPayload(
   tournamentScoreboardPayload
 ) {
   const groups = parseEspnStandings(standingsPayload);
-  const matches = parseEspnMatches(scoreboardPayload);
   const tournamentScoreboard = mergeScoreboards(
     scoreboardPayload,
     knockoutScoreboardPayload,
     tournamentScoreboardPayload
   );
-  const confirmedMatchups = findConfirmedMatchups(tournamentScoreboard);
-  const liveProjection = applyLiveScoresToGroups(groups, matches);
-  const goalEvents = matches
-    .flatMap((match) => match.goalEvents)
-    .sort(
-      (first, second) =>
-        Date.parse(
-          matches.find((match) => match.id === second.matchId)?.date ??
-            new Date().toISOString()
-        ) -
-          Date.parse(
-            matches.find((match) => match.id === first.matchId)?.date ??
-              new Date().toISOString()
-          ) ||
-        (second.clockValue ?? 0) - (first.clockValue ?? 0)
-    );
-  const projectedThirdPlace = rankThirdPlaceTeams(liveProjection.groups).sort(
-    compareThirdPlaceRows
-  );
+  const allMatches = parseEspnMatches(tournamentScoreboard);
+  const liveCount = allMatches.filter((match) => match.isLive).length;
+  const now = Date.now();
+  const nextKickoff =
+    allMatches
+      .filter((match) => !match.isFinished && !match.isLive && Date.parse(match.date) >= now)
+      .sort((first, second) => Date.parse(first.date) - Date.parse(second.date))[0] ??
+    null;
 
   return {
     generatedAt: new Date().toISOString(),
-    source: "espn",
-    sourceLabel: "ESPN",
-    refreshSeconds: REFRESH_SECONDS,
-    groups: liveProjection.groups,
-    thirdPlace: projectedThirdPlace,
-    matches,
-    confirmedMatchups,
+    groups,
+    allMatches,
+    bracket: buildBracket(allMatches),
     topScorers: parseTopScorersFromScoreboard(tournamentScoreboard, statsPayload),
-    tournamentStats: calculateTournamentStats(tournamentScoreboard),
-    goalEvents,
-    liveCount: matches.filter((match) => match.isLive).length,
-    liveStandingsApplied: liveProjection.applied,
-    nextKickoff: findNextKickoff(matches),
+    tournamentStats: calculateTournamentStats(allMatches, tournamentScoreboard),
+    liveCount,
+    nextKickoff,
     errors: [],
   };
 }
@@ -890,8 +759,6 @@ async function loadData(silent = false) {
   state.refreshing = silent;
   if (!silent) {
     state.error = null;
-  }
-  if (!silent) {
     render();
   }
 
@@ -929,22 +796,14 @@ async function loadData(silent = false) {
       throw new Error("ESPN grup sıralaması yanıtında veri bulunamadı.");
     }
 
-    // İlk yüklemede akıllı filtre: canlı yoksa bugüne, o da yoksa tümüne düş
     if (!state.data) {
-      if (payload.liveCount > 0) {
-        state.matchFilter = "live";
-      } else if (payload.matches.some((match) => isToday(match.date))) {
-        state.matchFilter = "today";
-      } else {
-        state.matchFilter = "all";
-      }
+      state.matchFilter = payload.liveCount > 0 ? "live" : "today";
     }
 
     state.data = payload;
     state.error = null;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Canlı veri alınamadı.";
-    // Elde veri varsa koru, sadece uyarı göster
     if (!state.data) {
       state.error = message;
     } else {
@@ -961,720 +820,582 @@ async function loadData(silent = false) {
    Biçimleyiciler
    ============================================================ */
 
-function formatDateTime(value) {
-  if (!value) {
-    return "-";
-  }
-  return dateTimeFormatter.format(new Date(value));
-}
-
 function formatScore(match) {
   const notStarted = !match.isLive && !match.isFinished;
   if (notStarted || match.homeGoals === null || match.awayGoals === null) {
-    return "vs";
+    return "–";
   }
-  return `${match.homeGoals} - ${match.awayGoals}`;
+  return `${match.homeGoals}–${match.awayGoals}`;
 }
 
-function translateRound(value) {
-  const label = String(value ?? "").replace(/^FIFA World Cup,?\s*/i, "");
-  const table = [
-    [/round of 32/i, "Son 32"],
-    [/round of 16/i, "Son 16"],
-    [/quarterfinals?/i, "Çeyrek Final"],
-    [/semifinals?/i, "Yarı Final"],
-    [/third place/i, "Üçüncülük Maçı"],
-    [/final/i, "Final"],
-  ];
-  for (const [pattern, translated] of table) {
-    if (pattern.test(label)) {
-      return translated;
-    }
-  }
-  return label;
-}
-
-function stageLabel(match) {
-  if (/^[A-L]$/.test(match.group)) {
-    return `GRUP ${match.group}`;
-  }
-  return translateRound(match.round ?? match.group ?? "");
+function localDayKey(value) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
 }
 
 function isToday(value) {
-  const date = new Date(value);
-  const now = new Date();
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
-}
-
-function qualificationLabel(value) {
-  if (value === "edge") {
-    return "Eşikte";
-  }
-  return value === "inside" ? "Çıkıyor" : "Dışarıda";
+  return localDayKey(value) === localDayKey(new Date());
 }
 
 function teamMatchesQuery(team, query) {
   return team.name.toLocaleLowerCase("tr-TR").includes(query);
 }
 
+function flagMarkup(team, cls = "flag") {
+  const source = team.flagUrl ?? team.logo;
+  if (!source) {
+    return `<span class="${cls}">${escapeHtml(teamInitials(team.name))}</span>`;
+  }
+  return `<span class="${cls}"><img src="${escapeHtml(source)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();" /></span>`;
+}
+
 /* ============================================================
-   Görsel bileşenler
+   Masthead
    ============================================================ */
 
-function flagMarkup(team, extraClass = "flag") {
-  const source = team.flagUrl ?? team.logo;
-  const label = `${team.name} bayrağı`;
-  if (!source) {
-    return `<span class="${extraClass}">${escapeHtml(teamInitials(team.name))}</span>`;
-  }
-  return `<span class="${extraClass}"><img src="${escapeHtml(source)}" alt="${escapeHtml(
-    label
-  )}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();" /></span>`;
-}
-
-function teamCell(team, compact = false, align = "left") {
-  return `<div class="team-cell${compact ? " compact" : ""}${
-    align === "right" ? " align-right" : ""
-  }">
-    ${flagMarkup(team)}
-    <span class="team-name">${escapeHtml(team.name)}</span>
-  </div>`;
-}
-
-function formDots(form) {
-  if (!form) {
-    return "";
-  }
-  const dots = String(form)
-    .toUpperCase()
-    .replace(/[^WDL]/g, "")
-    .slice(-5)
-    .split("")
-    .map((c) => `<i class="${c === "W" ? "w" : c === "D" ? "d" : "l"}"></i>`)
-    .join("");
-  return dots ? `<span class="form-dots" title="Son maçlar">${dots}</span>` : "";
-}
-
-/* ------------------ Ticker ------------------ */
-
-function tickerItem(match) {
-  const score = formatScore(match);
-  const minute = match.isLive
-    ? `<span class="t-min">${match.elapsed !== null ? `${match.elapsed}'` : "CANLI"}</span>`
-    : match.isFinished
-      ? `<span style="color:var(--faint);font-size:10.5px;font-weight:800">MS</span>`
-      : `<span style="color:var(--sky);font-size:10.5px;font-weight:800">${escapeHtml(
-          timeFormatter.format(new Date(match.date))
-        )}</span>`;
-
-  return `<span class="ticker-item">
-    ${minute}
-    ${flagMarkup(match.home, "t-flag")}
-    <span>${escapeHtml(match.home.name)}</span>
-    <span class="mono-score">${escapeHtml(score)}</span>
-    <span>${escapeHtml(match.away.name)}</span>
-    ${flagMarkup(match.away, "t-flag")}
-  </span>`;
-}
-
-function tickerBar(data) {
-  const liveMatches = data.matches.filter((m) => m.isLive);
-  const todays = data.matches.filter((m) => isToday(m.date));
-  const shown = liveMatches.length > 0 ? liveMatches : todays.slice(0, 10);
-
-  if (shown.length === 0) {
-    const next = data.nextKickoff;
-    return `<div class="ticker-bar">
-      <span class="ticker-label idle">Program</span>
-      <div class="ticker-viewport">
-        <div class="ticker-track" style="animation:none">
-          <span class="ticker-item">${
-            next
-              ? `Sıradaki maç: <strong style="color:var(--ink)">${escapeHtml(
-                  next.home.name
-                )} – ${escapeHtml(next.away.name)}</strong>&nbsp;· ${escapeHtml(
-                  formatDateTime(next.date)
-                )}`
-              : "Bugün planlanmış maç yok"
-          }</span>
-        </div>
-      </div>
-    </div>`;
-  }
-
-  const items = shown.map(tickerItem).join("");
-  const duration = Math.max(26, shown.length * 9);
-  const isLive = liveMatches.length > 0;
-
-  return `<div class="ticker-bar">
-    <span class="ticker-label${isLive ? "" : " idle"}">
-      ${isLive ? '<span class="live-dot"></span> Canlı' : "Bugün"}
-    </span>
-    <div class="ticker-viewport">
-      <div class="ticker-track" style="--ticker-duration:${duration}s">
-        ${items}${items}
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ------------------ Hero ------------------ */
-
-function heroSection(data) {
-  const liveBadge =
-    data.liveCount > 0
-      ? `<span class="badge red"><span class="live-dot"></span>${data.liveCount} canlı maç</span>`
-      : `<span class="badge sky">⚽ 2026 FIFA Dünya Kupası</span>`;
-
-  const next = data.nextKickoff;
-
-  return `<header class="hero reveal" id="top">
-    <div class="hero-row">
-      <div class="hero-copy">
-        <div class="badge-row">
-          ${liveBadge}
-          <span class="badge green">48 takım · 12 grup</span>
-          <span class="badge">Kaynak: ${escapeHtml(data.sourceLabel)}</span>
-          ${
-            data.liveStandingsApplied
-              ? '<span class="badge amber">Canlı puan projeksiyonu aktif</span>'
-              : ""
-          }
-        </div>
-        <h1>En iyi üçüncüler<br /><span class="grad">yarışı canlı</span></h1>
-        <p>
-          12 grubun üçüncülerinden en iyi 8'i son 32 turuna kalıyor. Skorlar,
-          puan durumu ve sıralama her ${REFRESH_SECONDS} saniyede bir otomatik güncellenir.
-        </p>
-      </div>
-      <div class="hero-actions">
-        <button class="refresh-button" data-action="refresh" ${
-          state.refreshing ? "disabled" : ""
-        }>
-          <span class="refresh-symbol${state.refreshing ? " spin" : ""}">⟳</span>
-          ${state.refreshing ? "Güncelleniyor…" : "Şimdi yenile"}
-        </button>
-        <span class="last-updated">Son güncelleme
-          <strong>${escapeHtml(timeFormatter.format(new Date(data.generatedAt)))}</strong>
-        </span>
+function mastheadSection(data) {
+  return `
+  <div class="topbar">
+    <div class="wrap topbar-in">
+      <div class="topbar-left">
+        <span class="hide-s">${escapeHtml(longDateFormatter.format(new Date()))}</span>
         ${
-          next
-            ? `<span class="countdown-chip">Sıradaki maça
-                <span class="mono" data-countdown="${escapeHtml(next.date)}">--:--:--</span>
-              </span>`
+          data.liveCount > 0
+            ? `<span class="live-flag"><span class="live-dot"></span>${data.liveCount} maç canlı</span>`
             : ""
         }
       </div>
-    </div>
-  </header>`;
-}
-
-/* ------------------ Metrikler ------------------ */
-
-function metricsSection(data) {
-  const stats = data.tournamentStats;
-  const scorers = data.topScorers;
-
-  const scorerContent =
-    scorers.length === 0
-      ? '<p class="scorer-empty">Veri bekleniyor</p>'
-      : `<div class="scorer-list">${scorers
-          .slice(0, 5)
-          .map(
-            (scorer) => `<div class="scorer-row">
-              <div class="scorer-main">
-                <span class="scorer-rank">${scorer.rank}</span>
-                ${flagMarkup(scorer.team)}
-                <div class="scorer-copy">
-                  <strong>${escapeHtml(scorer.playerName)}</strong>
-                  <span>${escapeHtml(scorer.team.name)}</span>
-                </div>
-              </div>
-              <span class="goal-badge">${escapeHtml(scorer.goals)}</span>
-            </div>`
-          )
-          .join("")}</div>`;
-
-  const teamGoals = data.groups
-    .flatMap((group) => group.rows)
-    .sort(
-      (first, second) =>
-        second.goalsFor - first.goalsFor ||
-        second.goalDifference - first.goalDifference ||
-        second.points - first.points ||
-        first.team.name.localeCompare(second.team.name)
-    )
-    .slice(0, 5);
-
-  return `<section class="metrics reveal" id="istatistik">
-    <article class="metric">
-      <div class="metric-label"><span>Turnuva golleri</span><span class="badge-mini green">⚽</span></div>
-      <div class="total-goals">
-        <span>Toplam gol</span>
-        <strong>${stats.totalGoals}</strong>
-      </div>
-      <p class="metric-sub">${stats.scoredMatches} maçta · maç başı ${
-        stats.goalsPerMatch !== null ? stats.goalsPerMatch.toFixed(2) : "-"
-      }</p>
-    </article>
-
-    <article class="metric">
-      <div class="metric-label"><span>Kartlar</span><span class="badge-mini amber">▮</span></div>
-      <div class="card-total-grid">
-        <div class="card-total yellow"><span>Sarı</span><strong>${stats.yellowCards}</strong></div>
-        <div class="card-total red"><span>Kırmızı</span><strong>${stats.redCards}</strong></div>
-      </div>
-      <p class="metric-sub">Turnuva geneli</p>
-    </article>
-
-    <article class="metric">
-      <div class="metric-label"><span>Gol krallığı</span><span class="badge-mini sky">👑</span></div>
-      ${scorerContent}
-    </article>
-
-    <article class="metric">
-      <div class="metric-label"><span>En golcü ülkeler</span><span class="badge-mini green">G</span></div>
-      <div class="scorer-list">${teamGoals
-        .map(
-          (row, index) => `<div class="scorer-row">
-            <div class="scorer-main">
-              <span class="scorer-rank">${index + 1}</span>
-              ${flagMarkup(row.team)}
-              <div class="scorer-copy">
-                <strong>${escapeHtml(row.team.name)}</strong>
-                <span>Grup ${escapeHtml(row.group)}</span>
-              </div>
-            </div>
-            <span class="goal-badge">${escapeHtml(row.goalsFor)}</span>
-          </div>`
-        )
-        .join("")}</div>
-    </article>
-  </section>`;
-}
-
-/* ------------------ Üçüncüler yarışı ------------------ */
-
-function thirdRaceSection(data) {
-  const rows = data.thirdPlace;
-
-  if (rows.length === 0) {
-    return `<section class="section-card reveal" id="ucunculer">
-      <div class="section-head">
-        <div class="section-title"><span class="icon">🎯</span><h2>En iyi üçüncüler yarışı</h2></div>
-      </div>
-      <p class="empty">Gruplar oynandıkça üçüncüler burada sıralanacak.</p>
-    </section>`;
-  }
-
-  const maxScore = Math.max(
-    ...rows.map((row) => row.points * 10 + Math.max(-9, Math.min(9, row.goalDifference)) + 9),
-    1
-  );
-
-  const rowMarkup = (row) => {
-    const barScore =
-      row.points * 10 + Math.max(-9, Math.min(9, row.goalDifference)) + 9;
-    const width = Math.max(4, Math.round((barScore / maxScore) * 100));
-    const gdClass = row.goalDifference > 0 ? "pos" : row.goalDifference < 0 ? "neg" : "";
-    const gdText = `${row.goalDifference > 0 ? "+" : ""}${row.goalDifference}`;
-
-    return `<div class="race-row ${row.qualification}">
-      <span class="race-rank">${row.thirdRank}</span>
-      <div class="race-team">
-        ${flagMarkup(row.team)}
-        <span class="team-name">${escapeHtml(row.team.name)}</span>
-        <span class="race-group">${escapeHtml(row.group)}</span>
-      </div>
-      <div class="race-bar-wrap"><div class="race-bar" style="width:${width}%"></div></div>
-      <div class="race-stats">
-        <span class="race-pts">${row.points} P</span>
-        <span class="race-gd ${gdClass}">${gdText}</span>
-      </div>
-    </div>`;
-  };
-
-  const inside = rows.filter((row) => row.qualification !== "outside");
-  const outside = rows.filter((row) => row.qualification === "outside");
-
-  return `<section class="section-card reveal" id="ucunculer">
-    <div class="section-head">
-      <div class="section-title"><span class="icon">🎯</span><h2>En iyi üçüncüler yarışı</h2></div>
-      <div class="section-note">
+      <div class="topbar-right">
         ${
-          data.liveStandingsApplied
-            ? '<span class="badge-mini red">● canlı projeksiyon</span>'
+          data.nextKickoff
+            ? `<span class="hide-s">Sıradaki maça <strong data-countdown="${escapeHtml(
+                data.nextKickoff.date
+              )}">--:--</strong></span>`
             : ""
         }
-        <span>İlk 8 son 32'ye kalır</span>
-      </div>
-    </div>
-    <div class="race-body">
-      ${inside.map(rowMarkup).join("")}
-      ${
-        outside.length > 0
-          ? `<div class="race-cutoff">Son 32 barajı</div>${outside
-              .map(rowMarkup)
-              .join("")}`
-          : ""
-      }
-    </div>
-    <div class="race-legend">
-      <span><i class="li-in"></i>İçeride (1-7)</span>
-      <span><i class="li-edge"></i>Eşikte (8.)</span>
-      <span><i class="li-out"></i>Dışarıda</span>
-      <span style="margin-left:auto">Bar: puan + averaj ağırlığı</span>
-    </div>
-  </section>`;
-}
-
-/* ------------------ Maç listesi ------------------ */
-
-function matchStatus(match) {
-  if (match.isLive) {
-    return `<span class="status live"><span class="live-dot"></span>${
-      match.elapsed !== null ? `${match.elapsed}'` : "CANLI"
-    }</span>`;
-  }
-  if (match.isFinished) {
-    return `<span class="status">MS</span>`;
-  }
-  return `<span class="status scheduled">${escapeHtml(
-    timeFormatter.format(new Date(match.date))
-  )}</span>`;
-}
-
-function matchCard(match) {
-  const goalRows = (match.goalEvents ?? [])
-    .slice(0, 3)
-    .map(
-      (goal) => `<div class="goal-mini-row">
-        <span>⚽ ${escapeHtml(goal.scorer ?? "Bilinmiyor")}${
-          goal.isPenalty ? " (P)" : ""
-        }${goal.isOwnGoal ? " (KK)" : ""} · ${escapeHtml(goal.team.name)}</span>
-        <span class="mono">${escapeHtml(goal.minute ?? "")}</span>
-      </div>`
-    )
-    .join("");
-
-  return `<article class="match-card${match.isLive ? " is-live" : ""}" data-match-id="${escapeHtml(
-    match.id
-  )}">
-    <div>
-      <div class="match-meta">
-        <span>${escapeHtml(stageLabel(match))}</span>
-        <span>${escapeHtml(formatDateTime(match.date))}</span>
-      </div>
-      <div class="score-line">
-        ${teamCell(match.home, true)}
-        <span class="score" data-score-id="${escapeHtml(match.id)}">${escapeHtml(
-          formatScore(match)
+        <span>Güncellendi ${escapeHtml(
+          timeFormatter.format(new Date(data.generatedAt))
         )}</span>
-        <div class="away-cell">${teamCell(match.away, true, "right")}</div>
+        <button class="refresh-link" data-action="refresh" ${
+          state.refreshing ? "disabled" : ""
+        }>${state.refreshing ? "yenileniyor…" : "yenile"}</button>
+      </div>
+    </div>
+  </div>
+  <header class="wrap masthead">
+    <p class="masthead-kicker">FIFA · ABD — Kanada — Meksika · 48 Takım</p>
+    <h1>Dünya Kupası<br />Yol Haritası <span class="yr">’26</span></h1>
+    <div class="masthead-sub">
+      <span>11 Haziran – 19 Temmuz · 16 şehir · 104 maç · Tamamı bu sayfada, canlı.</span>
+      <span class="mono">Veri her ${REFRESH_SECONDS} sn'de bir yenilenir</span>
+    </div>
+  </header>
+  <div class="wrap"><div class="double-rule"></div></div>`;
+}
+
+/* ============================================================
+   01 · Takvim şeridi
+   ============================================================ */
+
+function timelineSection(data) {
+  const byDay = new Map();
+  for (const match of data.allMatches) {
+    const key = localDayKey(match.date);
+    if (!byDay.has(key)) {
+      byDay.set(key, []);
+    }
+    byDay.get(key).push(match);
+  }
+
+  const days = [];
+  const cursor = new Date(`${TOURNAMENT_START}T12:00:00`);
+  const end = new Date(`${TOURNAMENT_END}T12:00:00`);
+  const todayKey = localDayKey(new Date());
+
+  while (cursor <= end) {
+    const key = localDayKey(cursor);
+    const matches = byDay.get(key) ?? [];
+    const isTodayCell = key === todayKey;
+    const isPast = key < todayKey;
+
+    const lines = matches
+      .slice(0, 4)
+      .map((match) => {
+        const score =
+          match.isLive || match.isFinished
+            ? `<span class="s">${match.homeGoals ?? "-"}–${match.awayGoals ?? "-"}</span>`
+            : `<span class="s">${escapeHtml(timeFormatter.format(new Date(match.date)))}</span>`;
+        return `<div class="day-match${match.isLive ? " live-m" : ""}">${escapeHtml(
+          teamShort(match.home)
+        )} ${score} ${escapeHtml(teamShort(match.away))}</div>`;
+      })
+      .join("");
+
+    days.push(`<div class="day${isTodayCell ? " today" : isPast ? " past" : ""}" ${
+      isTodayCell ? 'data-today="1"' : ""
+    }>
+      <div class="day-head">
+        <span class="day-num">${cursor.getDate()}</span>
+        <span class="day-wd">${
+          isTodayCell ? "Bugün" : escapeHtml(weekdayFormatter.format(cursor))
+        }</span>
+      </div>
+      <div class="day-month">${escapeHtml(monthFormatter.format(cursor))}</div>
+      ${
+        matches.length > 0
+          ? `<div class="day-matches">${lines}${
+              matches.length > 4 ? `<div class="day-more">+${matches.length - 4} maç</div>` : ""
+            }</div>`
+          : '<div class="day-empty">Maç yok</div>'
+      }
+    </div>`);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return `<section class="wrap" id="takvim">
+    <div class="sec-head">
+      <h2><span class="no">01</span>Takvim</h2>
+      <span class="sec-note">11 Haziran → 19 Temmuz</span>
+    </div>
+    <div class="timeline" data-timeline>${days.join("")}</div>
+  </section>`;
+}
+
+/* ============================================================
+   02 · Şampiyonluk yolu (bracket)
+   ============================================================ */
+
+function tieRow(team, goals, shootout, isWinner, isLoser) {
+  if (isPlaceholderTeam(team.name)) {
+    return `<div class="tie-row tbd">
+      <span class="tbd-flag"></span>
+      <span class="nm">Belirleniyor</span>
+      <span class="sc"></span>
+    </div>`;
+  }
+  return `<div class="tie-row${isWinner ? " winner" : ""}${isLoser ? " loser" : ""}">
+    ${flagMarkup(team)}
+    <span class="nm">${escapeHtml(team.name)}</span>
+    <span class="sc">${goals ?? ""}${
+      shootout !== null && shootout !== undefined && goals !== null ? ` (${shootout})` : ""
+    }</span>
+  </div>`;
+}
+
+function bracketSection(data) {
+  const columns = ROUND_ORDER.map((round) => {
+    const matches = data.bracket.get(round.key) ?? [];
+    const body =
+      matches.length === 0
+        ? '<div class="tie"><div class="tie-row tbd"><span class="tbd-flag"></span><span class="nm">Belirleniyor</span><span class="sc"></span></div></div>'
+        : matches
+            .map((match) => {
+              const meta = match.isLive
+                ? `CANLI ${match.elapsed !== null ? `· ${match.elapsed}'` : ""}`
+                : match.isFinished
+                  ? "Bitti"
+                  : dateTimeFormatter.format(new Date(match.date));
+              const decided = match.isFinished;
+              return `<div class="tie${match.isLive ? " live-tie" : ""}">
+                <div class="tie-meta"><span>${escapeHtml(meta)}</span><span>${escapeHtml(
+                  match.city ?? ""
+                )}</span></div>
+                ${tieRow(
+                  match.home,
+                  match.isLive || match.isFinished ? match.homeGoals : null,
+                  match.homeShootout,
+                  decided && match.homeWinner,
+                  decided && match.awayWinner
+                )}
+                ${tieRow(
+                  match.away,
+                  match.isLive || match.isFinished ? match.awayGoals : null,
+                  match.awayShootout,
+                  decided && match.awayWinner,
+                  decided && match.homeWinner
+                )}
+              </div>`;
+            })
+            .join("");
+
+    return `<div class="round-col">
+      <div class="round-title"><span>${round.label}</span><span class="cnt">${
+        matches.length || ""
+      }</span></div>
+      <div class="round-body">${body}</div>
+    </div>`;
+  }).join("");
+
+  return `<section class="wrap" id="yol">
+    <div class="sec-head">
+      <h2><span class="no">02</span>Şampiyonluk Yolu</h2>
+      <span class="sec-note">Kazanan koyu · penaltılar parantezde</span>
+    </div>
+    <div class="bracket">${columns}</div>
+  </section>`;
+}
+
+/* ============================================================
+   03 · Takımını takip et
+   ============================================================ */
+
+function teamsFromGroups(groups) {
+  return groups
+    .flatMap((group) => group.rows.map((row) => ({ ...row.team, group: group.group, rank: row.rank })))
+    .sort((first, second) => first.name.localeCompare(second.name, "tr-TR"));
+}
+
+function matchInvolvesTeam(match, teamNameNorm) {
+  return (
+    normalizeTeamName(match.home.name) === teamNameNorm ||
+    normalizeTeamName(match.away.name) === teamNameNorm
+  );
+}
+
+function followSection(data) {
+  const teams = teamsFromGroups(data.groups);
+  const selectedNorm = state.followedTeam ? normalizeTeamName(state.followedTeam) : null;
+  const selected = selectedNorm
+    ? teams.find((team) => normalizeTeamName(team.name) === selectedNorm) ?? null
+    : null;
+
+  const options = teams
+    .map(
+      (team) =>
+        `<option value="${escapeHtml(team.name)}" ${
+          selected && team.name === selected.name ? "selected" : ""
+        }>${escapeHtml(team.name)}</option>`
+    )
+    .join("");
+
+  let panel = "";
+  if (selected) {
+    const teamMatches = data.allMatches.filter((match) =>
+      matchInvolvesTeam(match, normalizeTeamName(selected.name))
+    );
+    const played = teamMatches.filter((match) => match.isFinished || match.isLive);
+    const upcoming = teamMatches.filter((match) => !match.isFinished && !match.isLive);
+    const next = upcoming[0] ?? null;
+    const lastFinished = [...teamMatches].reverse().find((match) => match.isFinished);
+    const eliminated =
+      lastFinished &&
+      !next &&
+      roundKey(lastFinished) !== "final" &&
+      ((normalizeTeamName(lastFinished.home.name) === normalizeTeamName(selected.name) &&
+        lastFinished.awayWinner) ||
+        (normalizeTeamName(lastFinished.away.name) === normalizeTeamName(selected.name) &&
+          lastFinished.homeWinner));
+
+    const steps = teamMatches
+      .map((match) => {
+        const isHome =
+          normalizeTeamName(match.home.name) === normalizeTeamName(selected.name);
+        const opponent = isHome ? match.away : match.home;
+        const own = isHome ? match.homeGoals : match.awayGoals;
+        const opp = isHome ? match.awayGoals : match.homeGoals;
+        let result = "";
+        if (match.isFinished && own !== null && opp !== null) {
+          const winner = isHome ? match.homeWinner : match.awayWinner;
+          const loser = isHome ? match.awayWinner : match.homeWinner;
+          result =
+            winner || own > opp
+              ? '<span class="res w">G</span>'
+              : loser || opp > own
+                ? '<span class="res l">M</span>'
+                : '<span class="res d">B</span>';
+        } else if (match.isLive) {
+          result = '<span class="res l">CANLI</span>';
+        }
+        const isNext = next && match.id === next.id;
+        const scoreText =
+          match.isFinished || match.isLive
+            ? `${own ?? "-"}–${opp ?? "-"}`
+            : timeFormatter.format(new Date(match.date));
+
+        return `<div class="road-step${isNext ? " next" : ""}">
+          <div class="road-step-round"><span>${escapeHtml(stageLabel(match))}</span>${result}</div>
+          <div class="road-step-line">
+            ${flagMarkup(opponent)}
+            <span>${escapeHtml(opponent.name)}</span>
+            <span class="sc">${escapeHtml(scoreText)}</span>
+          </div>
+          <div class="road-step-sub">${escapeHtml(
+            dateTimeFormatter.format(new Date(match.date))
+          )}${match.venue ? ` · ${escapeHtml(match.venue)}` : ""}</div>
+        </div>`;
+      })
+      .join("");
+
+    const statusTag = eliminated
+      ? '<span class="tag red">Elendi</span>'
+      : next
+        ? `<span class="tag acc">Sıradaki: ${escapeHtml(stageLabel(next))}</span>`
+        : played.length > 0
+          ? '<span class="tag acc">Yolda</span>'
+          : "";
+
+    panel = `<div class="follow-panel">
+      <div class="follow-id">
+        ${flagMarkup(selected)}
+        <h3>${escapeHtml(selected.name)}</h3>
+        <div class="follow-tags">
+          <span class="tag">Grup ${escapeHtml(selected.group)} · ${selected.rank}. sıra</span>
+          ${statusTag}
+        </div>
       </div>
       ${
-        match.venue
-          ? `<div class="venue">📍 ${escapeHtml(match.venue)}${
-              match.city ? ` · ${escapeHtml(match.city)}` : ""
-            }</div>`
+        teamMatches.length > 0
+          ? `<div class="follow-road">${steps}</div>`
+          : '<p class="follow-empty">Bu takım için maç verisi bulunamadı.</p>'
+      }
+    </div>`;
+  }
+
+  return `<section class="wrap" id="takip">
+    <div class="sec-head">
+      <h2><span class="no">03</span>Takımını Takip Et</h2>
+      <span class="sec-note">Seçim bu tarayıcıda hatırlanır</span>
+    </div>
+    <div class="follow-bar">
+      <label for="follow-select">Takım</label>
+      <select id="follow-select" data-input="follow-select">
+        <option value="">Seçiniz…</option>
+        ${options}
+      </select>
+      ${
+        selected
+          ? '<button class="follow-clear" data-action="follow-clear">seçimi kaldır</button>'
           : ""
       }
-      ${goalRows ? `<div class="goal-mini">${goalRows}</div>` : ""}
     </div>
-    <div class="match-status">${matchStatus(match)}</div>
-  </article>`;
+    ${panel}
+  </section>`;
 }
+
+/* ============================================================
+   04 · Maç merkezi
+   ============================================================ */
 
 function filteredMatches(data) {
   const query = state.matchQuery.trim().toLocaleLowerCase("tr-TR");
-  return data.matches.filter((match) => {
-    if (state.matchFilter === "live" && !match.isLive) {
-      return false;
-    }
-    if (state.matchFilter === "today" && !isToday(match.date)) {
-      return false;
-    }
-    if (
-      state.selectedGroup !== "all" &&
-      match.group !== state.selectedGroup
-    ) {
-      return false;
-    }
-    if (
-      query &&
-      !teamMatchesQuery(match.home, query) &&
-      !teamMatchesQuery(match.away, query)
-    ) {
-      return false;
-    }
-    return true;
-  });
+  let matches = data.allMatches;
+
+  if (state.matchFilter === "live") {
+    matches = matches.filter((match) => match.isLive);
+  } else if (state.matchFilter === "today") {
+    matches = matches.filter((match) => isToday(match.date));
+  } else if (state.matchFilter === "upcoming") {
+    matches = matches.filter((match) => !match.isFinished && !match.isLive);
+  } else if (state.matchFilter === "finished") {
+    matches = [...matches.filter((match) => match.isFinished)].reverse();
+  }
+
+  if (query) {
+    matches = matches.filter(
+      (match) =>
+        teamMatchesQuery(match.home, query) || teamMatchesQuery(match.away, query)
+    );
+  }
+
+  return matches;
+}
+
+function matchRow(match) {
+  const status = match.isLive
+    ? `<span class="m-status live"><span class="live-dot"></span>${
+        match.elapsed !== null ? `${match.elapsed}'` : "CANLI"
+      }</span>`
+    : match.isFinished
+      ? '<span class="m-status">MS</span>'
+      : `<span class="m-status">${escapeHtml(
+          dateTimeFormatter.format(new Date(match.date))
+        )}</span>`;
+
+  const goals =
+    (match.isLive || match.isFinished) && match.goalEvents.length > 0
+      ? `<div class="m-goals">${match.goalEvents
+          .map(
+            (goal) =>
+              `<span>${escapeHtml(goal.minute ?? "")} ${escapeHtml(
+                goal.scorer ?? "?"
+              )}${goal.isPenalty ? " (P)" : ""}${goal.isOwnGoal ? " (KK)" : ""} · ${escapeHtml(
+                teamShort(goal.team)
+              )}</span>`
+          )
+          .join("")}</div>`
+      : "";
+
+  return `<div class="m-row${match.isLive ? " live-m" : ""}">
+    ${status}
+    <div class="m-team">${flagMarkup(match.home)}<span class="nm">${escapeHtml(
+      match.home.name
+    )}</span></div>
+    <div class="m-score" data-score-id="${escapeHtml(match.id)}">${escapeHtml(
+      formatScore(match)
+    )}</div>
+    <div class="m-team right"><span class="nm">${escapeHtml(
+      match.away.name
+    )}</span>${flagMarkup(match.away)}</div>
+    <div class="m-stage">${escapeHtml(stageLabel(match))}${
+      match.city ? ` · ${escapeHtml(match.city)}` : ""
+    }</div>
+    ${goals}
+  </div>`;
 }
 
 function matchesSection(data) {
   const matches = filteredMatches(data);
-  const groupOptions = GROUP_ORDER.map(
-    (group) =>
-      `<option value="${group}" ${
-        state.selectedGroup === group ? "selected" : ""
-      }>Grup ${group}</option>`
-  ).join("");
+  const tabs = [
+    ["live", "Canlı"],
+    ["today", "Bugün"],
+    ["upcoming", "Gelecek"],
+    ["finished", "Biten"],
+    ["all", "Tümü"],
+  ];
 
-  const emptyLabel =
-    state.matchFilter === "live"
-      ? "Şu anda canlı maç yok. «Bugün» veya «Tümü» filtresini deneyin."
-      : "Bu filtreyle eşleşen maç bulunamadı.";
-
-  return `<section class="section-card reveal" id="maclar">
-    <div class="section-head">
-      <div class="section-title"><span class="icon">📺</span><h2>Maç merkezi</h2></div>
-      <div class="section-note"><span>${matches.length} maç görüntüleniyor</span></div>
+  return `<section class="wrap" id="maclar">
+    <div class="sec-head">
+      <h2><span class="no">04</span>Maç Merkezi</h2>
+      <div class="mc-head-tools">
+        <div class="mc-tabs">
+          ${tabs
+            .map(
+              ([key, label]) =>
+                `<button class="mc-tab${
+                  state.matchFilter === key ? " active" : ""
+                }" data-filter="${key}">${label}</button>`
+            )
+            .join("")}
+        </div>
+        <input
+          class="mc-search"
+          type="search"
+          placeholder="takım ara"
+          value="${escapeHtml(state.matchQuery)}"
+          data-input="match-query"
+          aria-label="Takım ara"
+        />
+      </div>
     </div>
-    <div class="match-toolbar">
-      <div class="match-top">
-        <div class="controls">
-          <label class="search-box">
-            <span aria-hidden="true">🔍</span>
-            <input
-              type="search"
-              placeholder="Takım ara…"
-              value="${escapeHtml(state.matchQuery)}"
-              data-input="match-query"
-              aria-label="Takım ara"
-            />
-          </label>
-          <select data-input="group-filter" aria-label="Grup filtresi">
-            <option value="all" ${
-              state.selectedGroup === "all" ? "selected" : ""
-            }>Tüm gruplar</option>
-            ${groupOptions}
-          </select>
+    <div class="match-table" aria-live="polite" data-match-table>
+      ${
+        matches.length > 0
+          ? matches.slice(0, 60).map(matchRow).join("")
+          : '<div class="m-empty">Bu filtreyle eşleşen maç yok.</div>'
+      }
+      ${
+        matches.length > 60
+          ? `<div class="m-empty">+ ${matches.length - 60} maç daha — filtre daraltın.</div>`
+          : ""
+      }
+    </div>
+  </section>`;
+}
+
+/* ============================================================
+   05 · Turnuva verisi — tek kart + gol krallığı
+   ============================================================ */
+
+function dataSection(data) {
+  const stats = data.tournamentStats;
+  const scorers = data.topScorers;
+
+  return `<section class="wrap" id="veri">
+    <div class="sec-head">
+      <h2><span class="no">05</span>Turnuva Verisi</h2>
+      <span class="sec-note">Goller, kartlar ve gol krallığı</span>
+    </div>
+    <div class="data-grid" style="margin-top:18px">
+      <div class="stat-card">
+        <p class="stat-kicker">Toplam gol</p>
+        <div class="stat-hero">
+          <strong>${stats.totalGoals}</strong>
+          <span>${stats.scoredMatches} maçta</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-cell">
+            <div class="v">${
+              stats.goalsPerMatch !== null ? stats.goalsPerMatch.toFixed(2) : "–"
+            }</div>
+            <div class="k">Gol / maç</div>
+          </div>
+          <div class="stat-cell">
+            <div class="v"><span class="chip y"></span>${stats.yellowCards}</div>
+            <div class="k">Sarı kart</div>
+          </div>
+          <div class="stat-cell">
+            <div class="v"><span class="chip r"></span>${stats.redCards}</div>
+            <div class="k">Kırmızı kart</div>
+          </div>
+          <div class="stat-cell">
+            <div class="v">${stats.scoredMatches}</div>
+            <div class="k">Oynanan maç</div>
+          </div>
         </div>
       </div>
-      <div class="filters">
-        <button class="filter-button${
-          state.matchFilter === "live" ? " active" : ""
-        }" data-filter="live">● Canlı</button>
-        <button class="filter-button${
-          state.matchFilter === "today" ? " active" : ""
-        }" data-filter="today">Bugün</button>
-        <button class="filter-button${
-          state.matchFilter === "all" ? " active" : ""
-        }" data-filter="all">Tümü</button>
-      </div>
-    </div>
-    <div class="match-list" aria-live="polite">
-      ${matches.length > 0 ? matches.map(matchCard).join("") : `<p class="empty">${emptyLabel}</p>`}
-    </div>
-    ${
-      data.nextKickoff
-        ? `<div class="next-kickoff">
-            <strong>Sıradaki maç: ${escapeHtml(data.nextKickoff.home.name)} – ${escapeHtml(
-              data.nextKickoff.away.name
-            )}</strong>
-            <span>${escapeHtml(formatDateTime(data.nextKickoff.date))}</span>
-          </div>`
-        : ""
-    }
-  </section>`;
-}
-
-/* ------------------ Son goller ------------------ */
-
-function recentGoalsSection(data) {
-  const goals = data.goalEvents.slice(0, 4);
-  if (goals.length === 0) {
-    return "";
-  }
-
-  return `<section class="section-card reveal">
-    <div class="section-head">
-      <div class="section-title"><span class="icon">⚽</span><h2>Son goller</h2></div>
-    </div>
-    <div class="goal-grid">
-      ${goals
-        .map(
-          (goal) => `<div class="goal-item">
-            ${flagMarkup(goal.team)}
-            <div class="goal-copy">
-              <strong>${escapeHtml(goal.scorer ?? "Bilinmiyor")}</strong>
-              <span>${escapeHtml(goal.home.name)} ${goal.homeGoals ?? "-"}-${
-                goal.awayGoals ?? "-"
-              } ${escapeHtml(goal.away.name)}</span>
-            </div>
-            <span class="goal-min">${escapeHtml(goal.minute ?? "")}</span>
-          </div>`
-        )
-        .join("")}
-    </div>
-  </section>`;
-}
-
-/* ------------------ Son 16 ------------------ */
-
-function knockoutSection(data) {
-  const matchups = data.confirmedMatchups;
-
-  return `<section class="section-card reveal" id="eslesmeler">
-    <div class="section-head">
-      <div class="section-title"><span class="icon">🏆</span><h2>Kesinleşen eleme eşleşmeleri</h2></div>
-      <div class="section-note"><span>${matchups.length} eşleşme</span></div>
-    </div>
-    ${
-      matchups.length === 0
-        ? '<p class="empty">Henüz kesinleşmiş eşleşme yok. Gruplar tamamlandıkça burada görünecek.</p>'
-        : `<div class="knockout-list">
-            ${matchups
-              .map(
-                (match) => `<div class="knockout-item">
-                  <div class="knockout-meta">
-                    <span>${escapeHtml(translateRound(match.round) || "Eleme")}</span>
-                    <span>${escapeHtml(formatDateTime(match.date))}</span>
-                  </div>
-                  <div class="knockout-line">
-                    ${teamCell(match.home, true)}
-                    <span class="versus">${
-                      match.homeGoals !== null && match.awayGoals !== null
-                        ? `${match.homeGoals}-${match.awayGoals}`
-                        : "VS"
-                    }</span>
-                    <div class="away-cell">${teamCell(match.away, true, "right")}</div>
-                  </div>
-                </div>`
-              )
-              .join("")}
-          </div>`
-    }
-  </section>`;
-}
-
-/* ------------------ Performans tablosu ------------------ */
-
-function comparePerformanceRows(first, second) {
-  return (
-    second.points - first.points ||
-    second.goalDifference - first.goalDifference ||
-    second.goalsFor - first.goalsFor ||
-    second.won - first.won ||
-    first.goalsAgainst - second.goalsAgainst ||
-    first.team.name.localeCompare(second.team.name)
-  );
-}
-
-function performanceSection(data) {
-  const rows = data.groups
-    .flatMap((groupItem) => groupItem.rows)
-    .sort(comparePerformanceRows)
-    .map((row, index) => ({ ...row, performanceRank: index + 1 }));
-
-  const body = rows
-    .map((row) => {
-      const rowClass =
-        row.performanceRank <= 8
-          ? "performance-top"
-          : row.rank <= 2
-            ? "performance-qualified"
-            : row.rank === 3
-              ? "performance-third"
-              : "";
-
-      return `<tr class="${rowClass}">
-        <td class="strong num" style="text-align:left">${row.performanceRank}</td>
-        <td>${teamCell(row.team, true)}</td>
-        <td><span class="group-pill">${escapeHtml(row.group)}</span></td>
-        <td class="num">${row.played}</td>
-        <td class="num">${row.won}</td>
-        <td class="num strong">${row.points}</td>
-        <td class="num">${row.goalDifference > 0 ? "+" : ""}${row.goalDifference}</td>
-        <td class="num">${row.goalsFor}</td>
-        <td class="num">${row.goalsAgainst}</td>
-      </tr>`;
-    })
-    .join("");
-
-  return `<section class="section-card reveal">
-    <div class="section-head">
-      <div class="section-title"><span class="icon">📊</span><h2>48 takım genel performans</h2></div>
-      <div class="section-note">
+      <div class="scorers">
+        <p class="stat-kicker">Gol krallığı</p>
         ${
-          data.liveStandingsApplied
-            ? '<span class="badge-mini red">● canlı puan</span>'
-            : ""
+          scorers.length === 0
+            ? '<p class="follow-empty">Veri bekleniyor.</p>'
+            : scorers
+                .map(
+                  (scorer) => `<div class="scorer-line">
+                    <span class="rk">${scorer.rank}</span>
+                    ${flagMarkup(scorer.team)}
+                    <span class="nm">${escapeHtml(scorer.playerName)}
+                      <small>${escapeHtml(scorer.team.name)}${
+                        scorer.assists ? ` · ${scorer.assists} asist` : ""
+                      }</small>
+                    </span>
+                    <span class="g">${scorer.goals}</span>
+                  </div>`
+                )
+                .join("")
         }
-        <span>Anlık sonuçlara göre</span>
       </div>
-    </div>
-    <div class="performance-scroll">
-      <table class="performance-table">
-        <thead>
-          <tr>
-            <th>#</th><th>Ülke</th><th>Grup</th><th class="num">O</th><th class="num">G</th>
-            <th class="num">P</th><th class="num">AV</th><th class="num">A</th><th class="num">Y</th>
-          </tr>
-        </thead>
-        <tbody>${body}</tbody>
-      </table>
     </div>
   </section>`;
 }
 
-/* ------------------ Gruplar ------------------ */
+/* ============================================================
+   06 · Gruplar (tamamlanan aşama)
+   ============================================================ */
 
 function groupsSection(data) {
-  return `<section class="reveal" id="gruplar">
-    <div class="section-head" style="border:0;padding:0 4px 14px">
-      <div class="section-title"><span class="icon">🗂️</span><h2>Grup puan durumları</h2></div>
-      <div class="section-note"><span>Üçüncü sıra vurgulu</span></div>
+  return `<section class="wrap" id="gruplar">
+    <div class="sec-head">
+      <h2><span class="no">06</span>Grup Aşaması</h2>
+      <span class="sec-note">Nihai puan durumu · • son 32'ye kalanlar</span>
     </div>
-    <div class="groups">
+    <div class="groups" style="margin-top:18px">
       ${data.groups
         .map(
-          (group) => `<article class="group-card">
-            <div class="group-head">
-              <h3>Grup <span class="g-letter">${escapeHtml(group.group)}</span></h3>
-              <span>O · G · B · M · AV · P</span>
-            </div>
-            <div class="table-scroll">
-              <table>
-                <tbody>
-                  ${group.rows
-                    .map(
-                      (row) => `<tr class="${row.rank === 3 ? "third-in-group" : ""}">
-                        <td class="strong" style="width:20px">${row.rank}</td>
-                        <td>${teamCell(row.team, true)} ${formDots(row.form)}</td>
-                        <td class="num">${row.played}</td>
-                        <td class="num">${row.won}</td>
-                        <td class="num">${row.drawn}</td>
-                        <td class="num">${row.lost}</td>
-                        <td class="num">${row.goalDifference > 0 ? "+" : ""}${
-                          row.goalDifference
-                        }</td>
-                        <td class="num strong">${row.points}</td>
-                      </tr>`
-                    )
-                    .join("")}
-                </tbody>
-              </table>
-            </div>
-          </article>`
+          (group) => `<div class="group-block">
+            <h3>Grup ${escapeHtml(group.group)}</h3>
+            <table class="g-table">
+              <tbody>
+                ${group.rows
+                  .map(
+                    (row) => `<tr${row.rank <= 2 ? ' class="q"' : ""}>
+                      <td class="r">${row.rank}</td>
+                      <td><span class="t">${flagMarkup(row.team)}<span class="nm">${escapeHtml(
+                        row.team.name
+                      )}</span></span></td>
+                      <td class="n">${row.goalDifference > 0 ? "+" : ""}${row.goalDifference}</td>
+                      <td class="n p">${row.points}</td>
+                    </tr>`
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </div>`
         )
         .join("")}
     </div>
   </section>`;
-}
-
-/* ------------------ Footer ------------------ */
-
-function footerSection(data) {
-  return `<footer class="site-footer">
-    <span>WC26 Üçüncüler Paneli · Veri: ESPN public API · ${REFRESH_SECONDS} sn'de bir otomatik yenilenir</span>
-    <a href="#top">↑ Başa dön</a>
-  </footer>`;
 }
 
 /* ============================================================
@@ -1683,15 +1404,14 @@ function footerSection(data) {
 
 function render() {
   if (state.loading) {
-    // index.html'deki skeleton zaten görünüyor; dokunma
-    return;
+    return; // index.html'deki skeleton görünür durumda
   }
 
   if (state.error && !state.data) {
     app.innerHTML = `<div class="error-box">
-      <p><strong>Canlı veri alınamadı.</strong></p>
-      <p style="margin-top:8px;font-weight:500">${escapeHtml(state.error)}</p>
-      <p style="margin-top:12px"><button class="refresh-button" data-action="refresh">Tekrar dene</button></p>
+      <strong>Canlı veri alınamadı.</strong>
+      <p style="margin-top:8px">${escapeHtml(state.error)}</p>
+      <button class="refresh-link" data-action="refresh">tekrar dene</button>
     </div>`;
     bindEvents();
     return;
@@ -1699,64 +1419,54 @@ function render() {
 
   const data = state.data;
 
-  // Odak/scroll durumunu koru
   const activeElement = document.activeElement;
   const focusKey = activeElement?.dataset?.input ?? null;
   const selectionStart = activeElement?.selectionStart ?? null;
-  const matchListScroll = app.querySelector(".match-list")?.scrollTop ?? 0;
-  const perfScroll = app.querySelector(".performance-scroll")?.scrollTop ?? 0;
-
-  const revealClass = state.firstRenderDone ? "" : "reveal";
+  const timelineScroll = app.querySelector("[data-timeline]")?.scrollLeft ?? null;
+  const bracketScroll = app.querySelector(".bracket")?.scrollLeft ?? null;
 
   app.innerHTML = `
-    ${tickerBar(data)}
-    <div class="shell">
-      <div class="container">
-        <nav class="section-nav" aria-label="Bölümler">
-          <a href="#ucunculer">Üçüncüler</a>
-          <a href="#maclar">Maçlar</a>
-          <a href="#gruplar">Gruplar</a>
-          <a href="#eslesmeler">Eleme</a>
-          <a href="#istatistik">İstatistik</a>
-        </nav>
-        ${heroSection(data)}
-        ${data.errors?.length ? `<div class="notice"><p>Son güncelleme denemesi başarısız oldu; bir önceki veriler gösteriliyor.</p><p>${escapeHtml(data.errors[0])}</p></div>` : ""}
-        ${metricsSection(data)}
-        <div class="grid-main">
-          ${thirdRaceSection(data)}
-          ${matchesSection(data)}
-        </div>
-        ${recentGoalsSection(data)}
-        ${groupsSection(data)}
-        <div class="standings-grid">
-          ${performanceSection(data)}
-          ${knockoutSection(data)}
-        </div>
-        ${footerSection(data)}
-      </div>
-    </div>`;
+    ${mastheadSection(data)}
+    ${
+      data.errors?.length
+        ? `<div class="wrap"><div class="notice">Son güncelleme başarısız oldu; önceki veriler gösteriliyor. (${escapeHtml(
+            data.errors[0]
+          )})</div></div>`
+        : ""
+    }
+    ${timelineSection(data)}
+    ${bracketSection(data)}
+    ${followSection(data)}
+    ${matchesSection(data)}
+    ${dataSection(data)}
+    ${groupsSection(data)}
+    <footer class="wrap site-footer">
+      <span>Dünya Kupası Yol Haritası '26 — veri: ESPN public API</span>
+      <a href="#takvim">yukarı ↑</a>
+    </footer>`;
 
-  // Reveal animasyonu sadece ilk render'da
-  if (state.firstRenderDone) {
-    app.querySelectorAll(".reveal").forEach((el) => el.classList.remove("reveal"));
-  } else {
-    app.querySelectorAll(".reveal").forEach((el, index) => {
-      el.style.animationDelay = `${Math.min(index * 70, 420)}ms`;
-    });
-    state.firstRenderDone = true;
+  // Takvimi bugüne kaydır (ilk render) ya da konumu koru
+  const timeline = app.querySelector("[data-timeline]");
+  if (timeline) {
+    if (!state.timelineScrolled) {
+      const todayCell = timeline.querySelector('[data-today="1"]');
+      if (todayCell) {
+        timeline.scrollLeft = Math.max(
+          0,
+          todayCell.offsetLeft - timeline.clientWidth / 2 + todayCell.clientWidth / 2
+        );
+      }
+      state.timelineScrolled = true;
+    } else if (timelineScroll !== null) {
+      timeline.scrollLeft = timelineScroll;
+    }
   }
 
-  // Scroll konumlarını geri yükle
-  const matchList = app.querySelector(".match-list");
-  if (matchList) {
-    matchList.scrollTop = matchListScroll;
-  }
-  const perfPanel = app.querySelector(".performance-scroll");
-  if (perfPanel) {
-    perfPanel.scrollTop = perfScroll;
+  const bracket = app.querySelector(".bracket");
+  if (bracket && bracketScroll !== null) {
+    bracket.scrollLeft = bracketScroll;
   }
 
-  // Odak geri yükle
   if (focusKey) {
     const nextField = app.querySelector(`[data-input="${focusKey}"]`);
     if (nextField) {
@@ -1765,22 +1475,21 @@ function render() {
         try {
           nextField.setSelectionRange(selectionStart, selectionStart);
         } catch {
-          /* select elementinde yok */
+          /* select alanında yok */
         }
       }
     }
   }
 
+  state.firstRenderDone = true;
   bindEvents();
   flashChangedScores(data);
   updateCountdown();
-  setupScrollSpy();
 }
 
-/* Gol flaşı: skoru değişen maçların skor kutusuna animasyon */
 function flashChangedScores(data) {
   const nextScores = new Map();
-  for (const match of data.matches) {
+  for (const match of data.allMatches) {
     nextScores.set(String(match.id), `${match.homeGoals}-${match.awayGoals}`);
   }
 
@@ -1791,7 +1500,6 @@ function flashChangedScores(data) {
         const el = app.querySelector(`[data-score-id="${CSS.escape(id)}"]`);
         if (el) {
           el.classList.remove("goal-flash");
-          // reflow ile animasyonu yeniden tetikle
           void el.offsetWidth;
           el.classList.add("goal-flash");
         }
@@ -1814,7 +1522,12 @@ function bindEvents() {
   app.querySelectorAll("[data-filter]").forEach((button) => {
     button.addEventListener("click", () => {
       state.matchFilter = button.dataset.filter;
-      render();
+      renderMatchTableOnly();
+      app
+        .querySelectorAll("[data-filter]")
+        .forEach((tab) =>
+          tab.classList.toggle("active", tab.dataset.filter === state.matchFilter)
+        );
     });
   });
 
@@ -1822,46 +1535,62 @@ function bindEvents() {
   if (queryInput) {
     queryInput.addEventListener("input", (event) => {
       state.matchQuery = event.target.value;
-      renderMatchListOnly();
+      renderMatchTableOnly();
     });
   }
 
-  const groupSelect = app.querySelector("[data-input='group-filter']");
-  if (groupSelect) {
-    groupSelect.addEventListener("change", (event) => {
-      state.selectedGroup = event.target.value;
-      renderMatchListOnly();
+  const followSelect = app.querySelector("[data-input='follow-select']");
+  if (followSelect) {
+    followSelect.addEventListener("change", (event) => {
+      state.followedTeam = event.target.value || null;
+      try {
+        if (state.followedTeam) {
+          window.localStorage.setItem(FOLLOW_STORAGE_KEY, state.followedTeam);
+        } else {
+          window.localStorage.removeItem(FOLLOW_STORAGE_KEY);
+        }
+      } catch {
+        /* storage kapalı */
+      }
+      render();
+      document.querySelector("#takip")?.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  const clearButton = app.querySelector("[data-action='follow-clear']");
+  if (clearButton) {
+    clearButton.addEventListener("click", () => {
+      state.followedTeam = null;
+      try {
+        window.localStorage.removeItem(FOLLOW_STORAGE_KEY);
+      } catch {
+        /* storage kapalı */
+      }
+      render();
     });
   }
 }
 
-/* Arama yazarken tüm sayfayı değil sadece maç listesini güncelle */
-function renderMatchListOnly() {
+function renderMatchTableOnly() {
   const data = state.data;
   if (!data) {
     return;
   }
-  const list = app.querySelector(".match-list");
-  const note = app.querySelector("#maclar .section-note span");
-  if (!list) {
+  const table = app.querySelector("[data-match-table]");
+  if (!table) {
     render();
     return;
   }
   const matches = filteredMatches(data);
-  const emptyLabel =
-    state.matchFilter === "live"
-      ? "Şu anda canlı maç yok. «Bugün» veya «Tümü» filtresini deneyin."
-      : "Bu filtreyle eşleşen maç bulunamadı.";
-  list.innerHTML =
+  table.innerHTML =
     matches.length > 0
-      ? matches.map(matchCard).join("")
-      : `<p class="empty">${emptyLabel}</p>`;
-  if (note) {
-    note.textContent = `${matches.length} maç görüntüleniyor`;
-  }
+      ? matches.slice(0, 60).map(matchRow).join("") +
+        (matches.length > 60
+          ? `<div class="m-empty">+ ${matches.length - 60} maç daha — filtre daraltın.</div>`
+          : "")
+      : '<div class="m-empty">Bu filtreyle eşleşen maç yok.</div>';
 }
 
-/* Geri sayım: saniyede bir sadece metni güncelle */
 let countdownTimer = null;
 
 function updateCountdown() {
@@ -1873,7 +1602,6 @@ function updateCountdown() {
   if (!el) {
     return;
   }
-
   const target = Date.parse(el.dataset.countdown);
   if (!Number.isFinite(target)) {
     return;
@@ -1882,7 +1610,7 @@ function updateCountdown() {
   const tick = () => {
     const diff = target - Date.now();
     if (diff <= 0) {
-      el.textContent = "Başladı!";
+      el.textContent = "başladı";
       clearInterval(countdownTimer);
       countdownTimer = null;
       return;
@@ -1892,7 +1620,7 @@ function updateCountdown() {
     const seconds = Math.floor((diff % 60_000) / 1_000);
     el.textContent =
       hours > 48
-        ? `${Math.floor(hours / 24)} gün ${hours % 24} sa`
+        ? `${Math.floor(hours / 24)}g ${hours % 24}s`
         : `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(
             seconds
           ).padStart(2, "0")}`;
@@ -1900,44 +1628,6 @@ function updateCountdown() {
 
   tick();
   countdownTimer = setInterval(tick, 1000);
-}
-
-/* Scroll-spy: görünür bölüme göre nav vurgusu */
-let scrollSpyObserver = null;
-
-function setupScrollSpy() {
-  if (scrollSpyObserver) {
-    scrollSpyObserver.disconnect();
-  }
-
-  const links = [...app.querySelectorAll(".section-nav a")];
-  if (links.length === 0) {
-    return;
-  }
-
-  const sections = links
-    .map((link) => document.querySelector(link.getAttribute("href")))
-    .filter(Boolean);
-
-  scrollSpyObserver = new IntersectionObserver(
-    (entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-      if (!visible) {
-        return;
-      }
-      links.forEach((link) =>
-        link.classList.toggle(
-          "active",
-          link.getAttribute("href") === `#${visible.target.id}`
-        )
-      );
-    },
-    { rootMargin: "-15% 0px -55% 0px", threshold: [0.05, 0.25, 0.5] }
-  );
-
-  sections.forEach((section) => scrollSpyObserver.observe(section));
 }
 
 /* ============================================================
