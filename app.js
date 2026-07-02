@@ -19,6 +19,12 @@ const REFRESH_SECONDS = 10;
 const TOURNAMENT_START = "2026-06-11";
 const TOURNAMENT_END = "2026-07-19";
 const FOLLOW_STORAGE_KEY = "wc26-followed-team";
+const THEME_STORAGE_KEY = "wc26-theme";
+
+const INSTAGRAM_USERNAME = "vozinha1";
+const INSTAGRAM_FUNCTION_URL =
+  "https://exquisite-brigadeiros-5f6f4f.netlify.app/.netlify/functions/instagram-followers";
+const INSTAGRAM_REFRESH_SECONDS = 60;
 
 const TEAM_FLAG_CODES = {
   algeria: "dz",
@@ -117,6 +123,13 @@ const state = {
   matchQuery: "",
   followedTeam: null,
   timelineScrolled: false,
+  instagram: {
+    loading: true,
+    error: null,
+    followerCount: null,
+    followerText: null,
+    fetchedAt: null,
+  },
 };
 
 try {
@@ -140,6 +153,27 @@ const timeFormatter = new Intl.DateTimeFormat("tr-TR", {
 });
 const weekdayFormatter = new Intl.DateTimeFormat("tr-TR", { weekday: "short" });
 const monthFormatter = new Intl.DateTimeFormat("tr-TR", { month: "long" });
+const numberFormatter = new Intl.NumberFormat("tr-TR");
+
+/* ============================================================
+   Tema
+   ============================================================ */
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", theme === "light" ? "#f2f3f5" : "#0c0d0f");
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    /* storage kapalı */
+  }
+}
 
 /* ============================================================
    Yardımcılar
@@ -806,6 +840,35 @@ async function loadData(silent = false) {
   }
 }
 
+/* Instagram takipçi sayısı (eski Netlify fonksiyonu, CORS açık) */
+async function loadInstagram() {
+  try {
+    const response = await fetch(
+      `${INSTAGRAM_FUNCTION_URL}?username=${encodeURIComponent(INSTAGRAM_USERNAME)}`,
+      { cache: "no-store" }
+    );
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error ?? "Instagram verisi alınamadı.");
+    }
+    state.instagram = {
+      loading: false,
+      error: null,
+      followerCount:
+        typeof payload.followerCount === "number" ? payload.followerCount : null,
+      followerText: payload.followerText ?? null,
+      fetchedAt: payload.fetchedAt ?? new Date().toISOString(),
+    };
+  } catch (error) {
+    state.instagram = {
+      ...state.instagram,
+      loading: false,
+      error: error instanceof Error ? error.message : "Instagram verisi alınamadı.",
+    };
+  }
+  updateInstagramCard();
+}
+
 /* ============================================================
    Biçimleyiciler
    ============================================================ */
@@ -857,6 +920,10 @@ function topbarSection(data) {
         <span class="hide-s">Güncellendi <span class="mono">${escapeHtml(
           timeFormatter.format(new Date(data.generatedAt))
         )}</span></span>
+        <button class="theme-btn" data-action="theme" aria-label="Tema değiştir" title="Açık / koyu tema">
+          <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
         <button class="refresh-btn" data-action="refresh" ${
           state.refreshing ? "disabled" : ""
         }><span class="${state.refreshing ? "spin" : ""}">⟳</span>${
@@ -986,6 +1053,55 @@ function nextMatchCard(data) {
       </div>
     </div>
   </article>`;
+}
+
+function instagramCardBody() {
+  const insta = state.instagram;
+  if (insta.loading) {
+    return '<div class="insta-body"><span class="insta-count">…<small>yükleniyor</small></span></div>';
+  }
+  if (insta.error && insta.followerCount === null) {
+    return `<div class="insta-body"><span class="insta-err">${escapeHtml(
+      insta.error
+    )}</span></div>`;
+  }
+  const countText =
+    insta.followerCount !== null
+      ? numberFormatter.format(insta.followerCount)
+      : (insta.followerText ?? "–");
+  return `<div class="insta-body">
+    <span class="insta-count">${escapeHtml(countText)}<small>takipçi</small></span>
+    <div class="insta-foot">
+      <a href="https://www.instagram.com/${INSTAGRAM_USERNAME}/" target="_blank" rel="noopener">@${INSTAGRAM_USERNAME}</a>
+      <span>${
+        insta.fetchedAt
+          ? escapeHtml(timeFormatter.format(new Date(insta.fetchedAt)))
+          : ""
+      }</span>
+    </div>
+  </div>`;
+}
+
+function instagramCard() {
+  return `<article class="card" data-insta-card>
+    <div class="card-head">
+      <h2>Instagram</h2>
+      <span class="card-note">${INSTAGRAM_REFRESH_SECONDS} sn'de bir</span>
+    </div>
+    ${instagramCardBody()}
+  </article>`;
+}
+
+function updateInstagramCard() {
+  const card = app.querySelector("[data-insta-card]");
+  if (!card) {
+    return;
+  }
+  const body = card.querySelector(".insta-body, .m-empty");
+  const markup = instagramCardBody();
+  if (body) {
+    body.outerHTML = markup;
+  }
 }
 
 /* ============================================================
@@ -1491,10 +1607,11 @@ function render() {
             )})</div>`
           : ""
       }
-      <div class="grid cards-3">
+      <div class="grid cards-4">
         ${statCard(data)}
         ${scorersCard(data)}
         ${nextMatchCard(data)}
+        ${instagramCard()}
       </div>
       ${timelineCard(data)}
       <div class="grid main-2">
@@ -1586,6 +1703,13 @@ function bindEvents() {
   app.querySelectorAll("[data-action='refresh']").forEach((button) => {
     button.addEventListener("click", () => loadData(false));
   });
+
+  const themeButton = app.querySelector("[data-action='theme']");
+  if (themeButton) {
+    themeButton.addEventListener("click", () => {
+      applyTheme(currentTheme() === "light" ? "dark" : "light");
+    });
+  }
 
   app.querySelectorAll("[data-filter]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1715,11 +1839,19 @@ function updateCountdowns() {
    ============================================================ */
 
 loadData();
+loadInstagram();
+
 setInterval(() => {
   if (!document.hidden) {
     loadData(true);
   }
 }, REFRESH_SECONDS * 1000);
+
+setInterval(() => {
+  if (!document.hidden) {
+    loadInstagram();
+  }
+}, INSTAGRAM_REFRESH_SECONDS * 1000);
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {

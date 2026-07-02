@@ -30,6 +30,52 @@
   --r-s: 8px;
 }
 
+/* Açık tema */
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f2f3f5;
+  --surface: #ffffff;
+  --surface-2: #f5f6f8;
+  --surface-3: #e9ebee;
+  --border: #e3e5e9;
+  --border-strong: #c9ccd4;
+
+  --ink: #15181d;
+  --muted: #5a626e;
+  --faint: #8a919c;
+
+  --accent: #0da35e;
+  --accent-dim: rgb(13 163 94 / 0.1);
+  --live: #e02d22;
+  --live-dim: rgb(224 45 34 / 0.08);
+  --draw: #b07f0a;
+}
+
+html[data-theme="light"] .topbar {
+  background: rgb(255 255 255 / 0.9);
+}
+
+html[data-theme="light"] .flag {
+  outline-color: rgb(0 0 0 / 0.12);
+}
+
+html[data-theme="light"] .day.past {
+  background: rgb(0 0 0 / 0.035);
+}
+
+html[data-theme="light"] .refresh-btn {
+  color: #fff;
+}
+
+html[data-theme="light"] .mc-tab.active {
+  color: #fff;
+}
+
+html[data-theme="light"] .sk::after {
+  background: linear-gradient(100deg, transparent 30%, rgb(0 0 0 / 0.04) 50%, transparent 70%);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -198,6 +244,34 @@ p {
   filter: brightness(1.1);
 }
 
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  background: var(--surface-2);
+  color: var(--muted);
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.theme-btn:hover {
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+
+.theme-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+html[data-theme="dark"] .theme-btn .ic-moon,
+html[data-theme="light"] .theme-btn .ic-sun {
+  display: none;
+}
+
 .spin {
   display: inline-block;
   animation: spin 0.8s linear infinite;
@@ -277,8 +351,8 @@ p {
   margin-top: 18px;
 }
 
-.grid.cards-3 {
-  grid-template-columns: 1.25fr 1fr 0.95fr;
+.grid.cards-4 {
+  grid-template-columns: 1.2fr 1fr 0.95fr 0.8fr;
 }
 
 .grid.main-2 {
@@ -523,6 +597,58 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Instagram kartı */
+.insta-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insta-count {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.insta-count small {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.insta-foot {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.insta-foot a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.insta-foot a:hover {
+  text-decoration: underline;
+}
+
+.insta-err {
+  font-size: 12px;
+  color: var(--live);
 }
 
 /* ============================================================
@@ -1337,15 +1463,14 @@ p {
    ============================================================ */
 
 @media (max-width: 1024px) {
-  .grid.cards-3 { grid-template-columns: 1fr 1fr; }
-  .grid.cards-3 .card:first-child { grid-column: 1 / -1; }
+  .grid.cards-4 { grid-template-columns: 1fr 1fr; }
   .grid.main-2 { grid-template-columns: 1fr; }
   .groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
   .wrap { width: calc(100% - 24px); }
-  .grid.cards-3 { grid-template-columns: 1fr; }
+  .grid.cards-4 { grid-template-columns: 1fr; }
   .groups { grid-template-columns: 1fr; }
   .topbar-right .hide-s { display: none; }
   .stat-mini-row { grid-template-columns: repeat(2, 1fr); }
