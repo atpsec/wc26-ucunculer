@@ -6,13 +6,13 @@
     <title>Dünya Kupası Yol Haritası ’26 — Canlı</title>
     <meta
       name="description"
-      content="2026 FIFA Dünya Kupası yol haritası: takvim, şampiyonluk yolu, canlı skorlar, takım takibi ve turnuva verileri. 10 saniyede bir güncellenir."
+      content="2026 FIFA Dünya Kupası yol haritası: canlı skorlar, maç merkezi, şampiyonluk yolu, takım takibi, gol krallığı ve turnuva verileri. 10 saniyede bir güncellenir."
     />
     <meta name="theme-color" content="#0c0d0f" />
     <meta property="og:title" content="Dünya Kupası Yol Haritası ’26 — Canlı" />
     <meta
       property="og:description"
-      content="Son 32'den finale: turnuvanın tamamı tek ekranda, canlı."
+      content="Son 32'den finale: fikstür, skorlar, canlı maçlar, gol krallığı ve takım yolu tek ekranda."
     />
     <link rel="icon" href="./favicon.svg" />
     <script>
@@ -29,32 +29,182 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://site.api.espn.com" />
+    <link rel="preconnect" href="https://site.web.api.espn.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260702-1" />
+    <style>
+      .boot-live {
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 32px 18px;
+        background:
+          radial-gradient(circle at 20% 20%, rgb(47 217 124 / 0.16), transparent 34%),
+          radial-gradient(circle at 80% 10%, rgb(255 78 69 / 0.13), transparent 28%),
+          var(--bg, #0c0d0f);
+      }
+
+      .boot-card {
+        width: min(760px, 100%);
+        border: 1px solid var(--border, #26282e);
+        border-radius: 22px;
+        background: color-mix(in srgb, var(--surface, #141518) 88%, transparent);
+        box-shadow: 0 24px 80px rgb(0 0 0 / 0.28);
+        overflow: hidden;
+      }
+
+      .boot-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--border, #26282e);
+      }
+
+      .boot-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+
+      .boot-pulse {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--live, #ff4e45);
+        box-shadow: 0 0 0 0 rgb(255 78 69 / 0.55);
+        animation: bootPulse 1.35s ease-out infinite;
+      }
+
+      .boot-status {
+        color: var(--muted, #9aa1ac);
+        font: 700 12px/1 var(--mono, monospace);
+        text-transform: uppercase;
+      }
+
+      .boot-body {
+        padding: 28px 20px 22px;
+      }
+
+      .boot-body h1 {
+        margin: 0;
+        max-width: 650px;
+        font-size: clamp(28px, 6vw, 54px);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+
+      .boot-body p {
+        margin: 14px 0 0;
+        max-width: 580px;
+        color: var(--muted, #9aa1ac);
+        font-size: 15px;
+      }
+
+      .boot-ticker {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 22px;
+      }
+
+      .boot-mini {
+        padding: 13px;
+        border: 1px solid var(--border, #26282e);
+        border-radius: 14px;
+        background: var(--surface-2, #1a1c20);
+      }
+
+      .boot-mini strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .boot-mini span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted, #9aa1ac);
+        font-size: 12px;
+      }
+
+      .boot-bar {
+        height: 3px;
+        margin-top: 22px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: var(--surface-3, #212429);
+      }
+
+      .boot-bar::before {
+        content: "";
+        display: block;
+        width: 38%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--accent, #2fd97c), var(--live, #ff4e45));
+        animation: bootLoad 1.45s ease-in-out infinite;
+      }
+
+      .boot-noscript {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgb(255 78 69 / 0.12);
+        color: var(--live, #ff4e45);
+        font-weight: 700;
+      }
+
+      @keyframes bootPulse {
+        70% { box-shadow: 0 0 0 12px rgb(255 78 69 / 0); }
+        100% { box-shadow: 0 0 0 0 rgb(255 78 69 / 0); }
+      }
+
+      @keyframes bootLoad {
+        0% { transform: translateX(-110%); }
+        50% { transform: translateX(85%); }
+        100% { transform: translateX(260%); }
+      }
+
+      @media (max-width: 640px) {
+        .boot-ticker { grid-template-columns: 1fr; }
+        .boot-head { align-items: flex-start; flex-direction: column; }
+      }
+    </style>
   </head>
   <body>
     <div id="app">
-      <div class="skeleton" aria-hidden="true">
-        <div class="sk sk-top"></div>
-        <div class="sk-wrap">
-          <div class="sk sk-head"></div>
-          <div class="sk-row">
-            <div class="sk sk-card"></div>
-            <div class="sk sk-card"></div>
-            <div class="sk sk-card"></div>
+      <section class="boot-live" aria-live="polite">
+        <div class="boot-card">
+          <div class="boot-head">
+            <div class="boot-brand"><span class="boot-pulse"></span>YOL HARİTASI ’26</div>
+            <div class="boot-status">Canlı veri bağlanıyor</div>
           </div>
-          <div class="sk sk-strip"></div>
-          <div class="sk-row main">
-            <div class="sk sk-panel"></div>
-            <div class="sk sk-panel"></div>
+          <div class="boot-body">
+            <h1>Dünya Kupası akışı yükleniyor.</h1>
+            <p>
+              Maç merkezi, şampiyonluk yolu, gol krallığı ve takım takip paneli ESPN canlı verileriyle hazırlanıyor.
+            </p>
+            <div class="boot-ticker" aria-hidden="true">
+              <div class="boot-mini"><strong>10 sn</strong><span>otomatik yenileme</span></div>
+              <div class="boot-mini"><strong>104 maç</strong><span>fikstür + skor</span></div>
+              <div class="boot-mini"><strong>Canlı</strong><span>gol ve sonuç takibi</span></div>
+            </div>
+            <div class="boot-bar" aria-hidden="true"></div>
+            <noscript>
+              <div class="boot-noscript">Bu uygulama canlı veriler için JavaScript gerektirir.</div>
+            </noscript>
           </div>
         </div>
-      </div>
+      </section>
       <p class="sr-only" role="status">Veriler yükleniyor</p>
     </div>
-    <script src="./app.js" defer></script>
+    <script src="./app.js?v=20260702-1" defer></script>
   </body>
 </html>
