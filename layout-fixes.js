@@ -4,16 +4,32 @@
   if (!app) return;
 
   let applying = false;
-  const allTimeScorers = [
-    [1, "Miroslav Klose", "Almanya", 16],
-    [2, "Ronaldo", "Brezilya", 15],
-    [3, "Gerd Müller", "Almanya", 14],
-    [4, "Just Fontaine", "Fransa", 13],
-    [5, "Lionel Messi", "Arjantin", 13],
+
+  const baseWorldCupGoals = [
+    ["Miroslav Klose", "Almanya", 16],
+    ["Ronaldo", "Brezilya", 15],
+    ["Gerd Müller", "Almanya", 14],
+    ["Just Fontaine", "Fransa", 13],
+    ["Lionel Messi", "Arjantin", 13],
+    ["Kylian Mbappé", "Fransa", 12],
+    ["Pelé", "Brezilya", 12],
+    ["Sándor Kocsis", "Macaristan", 11],
+    ["Jürgen Klinsmann", "Almanya", 11],
+    ["Harry Kane", "İngiltere", 8],
+    ["Cristiano Ronaldo", "Portekiz", 8],
   ];
 
   function textOf(node) {
     return String(node?.textContent ?? "").replace(/\s+/g, " ").trim();
+  }
+
+  function normalizeName(value) {
+    return String(value ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("tr-TR")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
   }
 
   function findMatchCard() {
@@ -70,20 +86,50 @@
     card.classList.add("live-match-card");
   }
 
+  function currentTournamentScorers() {
+    const cards = [...app.querySelectorAll(".grid.cards-4 > .card")];
+    const scorersCard = cards.find((card) => textOf(card.querySelector("h2")) === "Gol Krallığı");
+    if (!scorersCard) return new Map();
+
+    const map = new Map();
+    scorersCard.querySelectorAll(".list-pad > .s-row").forEach((row) => {
+      const rawName = textOf(row.querySelector(".nm"));
+      const small = textOf(row.querySelector(".nm small"));
+      const player = rawName.replace(small, "").trim();
+      const goals = Number(textOf(row.querySelector(".g")).replace(/[^0-9]/g, ""));
+      if (player && Number.isFinite(goals)) {
+        map.set(normalizeName(player), goals);
+      }
+    });
+    return map;
+  }
+
+  function liveAwareAllTimeScorers() {
+    const current = currentTournamentScorers();
+    return baseWorldCupGoals
+      .map(([player, country, baseGoals]) => {
+        const currentGoals = current.get(normalizeName(player)) ?? 0;
+        return { player, country, baseGoals, currentGoals, total: baseGoals + currentGoals };
+      })
+      .sort((a, b) => b.total - a.total || b.currentGoals - a.currentGoals || a.player.localeCompare(b.player, "tr-TR"))
+      .slice(0, 5);
+  }
+
   function allTimeCardMarkup() {
+    const rows = liveAwareAllTimeScorers();
     return `<article class="card all-time-card">
       <div class="card-head">
-        <h2>Tüm Zamanlar</h2>
-        <span class="card-note">DK gol krallığı</span>
+        <h2>DK Tüm Zamanlar</h2>
+        <span class="card-note">2026 dahil</span>
       </div>
       <div class="list-pad all-time-card-body">
-        ${allTimeScorers
+        ${rows
           .map(
-            ([rank, player, country, goals]) => `<div class="s-row all-time-row">
-              <span class="rk">${rank}</span>
+            (row, index) => `<div class="s-row all-time-row">
+              <span class="rk">${index + 1}</span>
               <span class="all-time-medal">★</span>
-              <span class="nm">${player}<small>${country}</small></span>
-              <span class="g">${goals}</span>
+              <span class="nm">${row.player}<small>${row.country}${row.currentGoals ? ` · 2026: +${row.currentGoals}` : ""}</small></span>
+              <span class="g">${row.total}</span>
             </div>`
           )
           .join("")}
@@ -91,16 +137,24 @@
     </article>`;
   }
 
-  function addAllTimeScorersCard() {
+  function addOrUpdateAllTimeScorersCard() {
     const cardsGrid = app.querySelector(".grid.cards-4");
-    if (!cardsGrid || cardsGrid.querySelector(".all-time-card")) return;
+    if (!cardsGrid) return;
+
+    const existing = cardsGrid.querySelector(".all-time-card");
+    const markup = allTimeCardMarkup();
+    if (existing) {
+      existing.outerHTML = markup;
+      return;
+    }
+
     const scorersCard = [...cardsGrid.querySelectorAll(".card")].find(
       (card) => textOf(card.querySelector("h2")) === "Gol Krallığı"
     );
     if (scorersCard) {
-      scorersCard.insertAdjacentHTML("afterend", allTimeCardMarkup());
+      scorersCard.insertAdjacentHTML("afterend", markup);
     } else {
-      cardsGrid.insertAdjacentHTML("beforeend", allTimeCardMarkup());
+      cardsGrid.insertAdjacentHTML("beforeend", markup);
     }
   }
 
@@ -117,7 +171,7 @@
       const liveItem = findLiveMatchItem();
       if (card && liveItem) setLiveCard(card, liveItem);
       removeEmbeddedAllTime();
-      addAllTimeScorersCard();
+      addOrUpdateAllTimeScorersCard();
       app.querySelectorAll("#maclar .m-item").forEach((item) => {
         item.classList.add("fixture-card");
         item.classList.toggle("fixture-live-card", item.classList.contains("live-m"));
@@ -131,7 +185,7 @@
   style.textContent = `
     .wc26-polished .wrap { width: min(1500px, 100% - 36px); }
     .wc26-polished .card { box-shadow: 0 12px 36px rgb(0 0 0 / 0.06); }
-    .wc26-polished .grid.cards-4 { grid-template-columns: 1.16fr .92fr .86fr .9fr .74fr; align-items: stretch; }
+    .wc26-polished .grid.cards-4 { grid-template-columns: 1.12fr .9fr .9fr .9fr .74fr; align-items: stretch; }
     .wc26-polished .grid.main-2 { grid-template-columns: minmax(0,1.55fr) minmax(340px,.72fr); gap: 18px; }
     .live-match-card { border-color: color-mix(in srgb, var(--live) 42%, var(--border)); box-shadow: 0 18px 54px rgb(255 78 69 / 0.08); }
     .live-match-card .card-head h2::before { background: var(--live); animation: pulse 1.5s ease-out infinite; }
