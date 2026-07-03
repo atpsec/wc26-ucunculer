@@ -4,6 +4,13 @@
   if (!app) return;
 
   let applying = false;
+  const allTimeScorers = [
+    [1, "Miroslav Klose", "Almanya", 16],
+    [2, "Ronaldo", "Brezilya", 15],
+    [3, "Gerd Müller", "Almanya", 14],
+    [4, "Just Fontaine", "Fransa", 13],
+    [5, "Lionel Messi", "Arjantin", 13],
+  ];
 
   function textOf(node) {
     return String(node?.textContent ?? "").replace(/\s+/g, " ").trim();
@@ -63,6 +70,30 @@
     card.classList.add("live-match-card");
   }
 
+  function addAllTimeScorers() {
+    const cards = [...app.querySelectorAll(".card")];
+    const scorersCard = cards.find((card) => textOf(card.querySelector("h2")) === "Gol Krallığı");
+    if (!scorersCard || scorersCard.querySelector(".all-time-scorers")) return;
+    const pad = scorersCard.querySelector(".list-pad");
+    if (!pad) return;
+    pad.insertAdjacentHTML(
+      "beforeend",
+      `<div class="all-time-scorers">
+        <div class="all-time-head"><span>Tüm Zamanlar</span><small>Dünya Kupası ilk 5</small></div>
+        ${allTimeScorers
+          .map(
+            ([rank, player, country, goals]) => `<div class="s-row all-time-row">
+              <span class="rk">${rank}</span>
+              <span class="all-time-medal">★</span>
+              <span class="nm">${player}<small>${country}</small></span>
+              <span class="g">${goals}</span>
+            </div>`
+          )
+          .join("")}
+      </div>`
+    );
+  }
+
   function enhance() {
     if (applying) return;
     applying = true;
@@ -71,6 +102,7 @@
       const card = findMatchCard();
       const liveItem = findLiveMatchItem();
       if (card && liveItem) setLiveCard(card, liveItem);
+      addAllTimeScorers();
       app.querySelectorAll("#maclar .m-item").forEach((item) => {
         item.classList.add("fixture-card");
         item.classList.toggle("fixture-live-card", item.classList.contains("live-m"));
@@ -92,6 +124,11 @@
     .live-card-line { align-items:center; gap:12px; }
     .live-score { min-width:96px; text-align:center; color:var(--ink); font-family:var(--mono); font-size:clamp(31px,4vw,46px); font-weight:800; letter-spacing:-0.06em; line-height:1; }
     .live-match-card .m-goals { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); display:grid; gap:6px; color:var(--muted); font-size:12px; }
+    .all-time-scorers { margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
+    .all-time-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 8px; color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .all-time-head small { color:var(--faint); font-size:11px; text-transform:none; letter-spacing:0; }
+    .all-time-row { background:color-mix(in srgb, var(--surface-2) 72%, transparent); border-radius:10px; }
+    .all-time-medal { width:28px; text-align:center; color:#d6a21a; font-size:13px; }
     .wc26-polished #yol { min-width:0; }
     .wc26-polished #yol .bracket { min-height:560px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x proximity; padding-bottom:12px; }
     .wc26-polished #yol .round-col { min-width:238px; scroll-snap-align:start; }
