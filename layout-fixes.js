@@ -70,16 +70,13 @@
     card.classList.add("live-match-card");
   }
 
-  function addAllTimeScorers() {
-    const cards = [...app.querySelectorAll(".card")];
-    const scorersCard = cards.find((card) => textOf(card.querySelector("h2")) === "Gol Krallığı");
-    if (!scorersCard || scorersCard.querySelector(".all-time-scorers")) return;
-    const pad = scorersCard.querySelector(".list-pad");
-    if (!pad) return;
-    pad.insertAdjacentHTML(
-      "beforeend",
-      `<div class="all-time-scorers">
-        <div class="all-time-head"><span>Tüm Zamanlar</span><small>Dünya Kupası ilk 5</small></div>
+  function allTimeCardMarkup() {
+    return `<article class="card all-time-card">
+      <div class="card-head">
+        <h2>Tüm Zamanlar</h2>
+        <span class="card-note">DK gol krallığı</span>
+      </div>
+      <div class="list-pad all-time-card-body">
         ${allTimeScorers
           .map(
             ([rank, player, country, goals]) => `<div class="s-row all-time-row">
@@ -90,8 +87,25 @@
             </div>`
           )
           .join("")}
-      </div>`
+      </div>
+    </article>`;
+  }
+
+  function addAllTimeScorersCard() {
+    const cardsGrid = app.querySelector(".grid.cards-4");
+    if (!cardsGrid || cardsGrid.querySelector(".all-time-card")) return;
+    const scorersCard = [...cardsGrid.querySelectorAll(".card")].find(
+      (card) => textOf(card.querySelector("h2")) === "Gol Krallığı"
     );
+    if (scorersCard) {
+      scorersCard.insertAdjacentHTML("afterend", allTimeCardMarkup());
+    } else {
+      cardsGrid.insertAdjacentHTML("beforeend", allTimeCardMarkup());
+    }
+  }
+
+  function removeEmbeddedAllTime() {
+    app.querySelectorAll(".all-time-scorers").forEach((node) => node.remove());
   }
 
   function enhance() {
@@ -102,7 +116,8 @@
       const card = findMatchCard();
       const liveItem = findLiveMatchItem();
       if (card && liveItem) setLiveCard(card, liveItem);
-      addAllTimeScorers();
+      removeEmbeddedAllTime();
+      addAllTimeScorersCard();
       app.querySelectorAll("#maclar .m-item").forEach((item) => {
         item.classList.add("fixture-card");
         item.classList.toggle("fixture-live-card", item.classList.contains("live-m"));
@@ -114,21 +129,23 @@
 
   const style = document.createElement("style");
   style.textContent = `
-    .wc26-polished .wrap { width: min(1380px, 100% - 36px); }
+    .wc26-polished .wrap { width: min(1500px, 100% - 36px); }
     .wc26-polished .card { box-shadow: 0 12px 36px rgb(0 0 0 / 0.06); }
-    .wc26-polished .grid.cards-4 { grid-template-columns: minmax(260px,1.08fr) minmax(260px,.92fr) minmax(280px,.9fr) minmax(240px,.72fr); align-items: stretch; }
+    .wc26-polished .grid.cards-4 { grid-template-columns: 1.16fr .92fr .86fr .9fr .74fr; align-items: stretch; }
     .wc26-polished .grid.main-2 { grid-template-columns: minmax(0,1.55fr) minmax(340px,.72fr); gap: 18px; }
     .live-match-card { border-color: color-mix(in srgb, var(--live) 42%, var(--border)); box-shadow: 0 18px 54px rgb(255 78 69 / 0.08); }
     .live-match-card .card-head h2::before { background: var(--live); animation: pulse 1.5s ease-out infinite; }
     .live-card-badge { display:inline-flex; align-items:center; gap:8px; align-self:center; margin-bottom:12px; padding:6px 10px; border-radius:999px; background:var(--live-dim); color:var(--live); font-size:12px; font-weight:800; }
     .live-card-line { align-items:center; gap:12px; }
-    .live-score { min-width:96px; text-align:center; color:var(--ink); font-family:var(--mono); font-size:clamp(31px,4vw,46px); font-weight:800; letter-spacing:-0.06em; line-height:1; }
+    .live-score { min-width:82px; text-align:center; color:var(--ink); font-family:var(--mono); font-size:clamp(28px,3.3vw,42px); font-weight:800; letter-spacing:-0.06em; line-height:1; }
     .live-match-card .m-goals { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); display:grid; gap:6px; color:var(--muted); font-size:12px; }
-    .all-time-scorers { margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
-    .all-time-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 8px; color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-    .all-time-head small { color:var(--faint); font-size:11px; text-transform:none; letter-spacing:0; }
+    .all-time-card .card-head h2::before { background:#d6a21a; }
+    .all-time-card-body { padding-top:10px; }
     .all-time-row { background:color-mix(in srgb, var(--surface-2) 72%, transparent); border-radius:10px; }
     .all-time-medal { width:28px; text-align:center; color:#d6a21a; font-size:13px; }
+    .all-time-card .s-row { min-height:50px; }
+    .all-time-card .nm { font-size:13px; }
+    .all-time-card .g { color:var(--accent); font-size:18px; }
     .wc26-polished #yol { min-width:0; }
     .wc26-polished #yol .bracket { min-height:560px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x proximity; padding-bottom:12px; }
     .wc26-polished #yol .round-col { min-width:238px; scroll-snap-align:start; }
@@ -142,8 +159,9 @@
     .wc26-polished #maclar .fixture-live-card .m-line { display:grid; justify-items:center; gap:7px; padding:10px; border-radius:12px; background:var(--surface-2); }
     .wc26-polished #maclar .fixture-live-card .m-line .g { font-family:var(--mono); font-size:30px; line-height:1; color:var(--ink); }
     .wc26-polished #maclar .fixture-live-card .m-tag { justify-self:center; text-align:center; color:var(--muted); }
-    @media (max-width:1180px){ .wc26-polished .grid.cards-4{grid-template-columns:repeat(2,minmax(0,1fr));} .wc26-polished .grid.main-2{grid-template-columns:1fr;} .wc26-polished #maclar{position:static;max-height:none;} }
-    @media (max-width:720px){ .wc26-polished .wrap{width:min(100% - 22px,1380px);} .wc26-polished .grid.cards-4{grid-template-columns:1fr;} .wc26-polished #yol .bracket{min-height:0;display:flex;gap:12px;padding:12px;} .wc26-polished #yol .round-col{min-width:min(82vw,320px);border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface-2);} .wc26-polished #maclar .fixture-card{grid-template-columns:46px minmax(0,1fr);} .wc26-polished #maclar .fixture-card .m-tag{grid-column:1/-1;padding:0 12px 10px;} }
+    @media (max-width:1320px){ .wc26-polished .grid.cards-4{grid-template-columns:repeat(3,minmax(0,1fr));} }
+    @media (max-width:980px){ .wc26-polished .grid.cards-4{grid-template-columns:repeat(2,minmax(0,1fr));} .wc26-polished .grid.main-2{grid-template-columns:1fr;} .wc26-polished #maclar{position:static;max-height:none;} }
+    @media (max-width:720px){ .wc26-polished .wrap{width:min(100% - 22px,1500px);} .wc26-polished .grid.cards-4{grid-template-columns:1fr;} .wc26-polished #yol .bracket{min-height:0;display:flex;gap:12px;padding:12px;} .wc26-polished #yol .round-col{min-width:min(82vw,320px);border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface-2);} .wc26-polished #maclar .fixture-card{grid-template-columns:46px minmax(0,1fr);} .wc26-polished #maclar .fixture-card .m-tag{grid-column:1/-1;padding:0 12px 10px;} }
   `;
   document.head.appendChild(style);
 
