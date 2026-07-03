@@ -1,11 +1,9 @@
-/* Responsive polish layer. Keeps the original section order intact. */
 (() => {
   const app = document.querySelector("#app");
   if (!app) return;
 
   let applying = false;
-
-  const baseWorldCupGoals = [
+  const base = [
     ["Miroslav Klose", "Almanya", 16],
     ["Ronaldo", "Brezilya", 15],
     ["Gerd Müller", "Almanya", 14],
@@ -16,210 +14,104 @@
     ["Sándor Kocsis", "Macaristan", 11],
     ["Jürgen Klinsmann", "Almanya", 11],
     ["Harry Kane", "İngiltere", 8],
-    ["Cristiano Ronaldo", "Portekiz", 8],
+    ["Cristiano Ronaldo", "Portekiz", 8]
   ];
 
-  function textOf(node) {
-    return String(node?.textContent ?? "").replace(/\s+/g, " ").trim();
-  }
+  function txt(n) { return String(n?.textContent ?? "").replace(/\s+/g, " ").trim(); }
+  function norm(v) { return String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
 
-  function normalizeName(value) {
-    return String(value ?? "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLocaleLowerCase("tr-TR")
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-  }
+  function directCardsGrid() { return app.querySelector("main.wrap > .grid.cards-4"); }
+  function directCards() { const grid = directCardsGrid(); return grid ? [...grid.children].filter((el) => el.classList?.contains("card")) : []; }
+  function cardTitle(card) { return txt(card.querySelector(":scope > .card-head h2")); }
 
-  function findMatchCard() {
-    return [...app.querySelectorAll(".card")].find((card) => {
-      const title = textOf(card.querySelector("h2"));
-      return title === "Sıradaki Maç" || title === "Canlı Maç";
-    });
-  }
-
-  function findLiveMatchItem() {
-    return app.querySelector("#maclar .m-item.live-m");
-  }
-
-  function cloneFlag(teamLine) {
-    return teamLine?.querySelector(".flag")?.cloneNode(true) ?? document.createElement("span");
-  }
-
-  function teamName(teamLine) {
-    return textOf(teamLine?.querySelector(".nm")) || "Takım";
-  }
-
-  function teamScore(teamLine) {
-    return textOf(teamLine?.querySelector(".g")) || "-";
-  }
-
-  function setLiveCard(card, liveItem) {
-    const lines = [...liveItem.querySelectorAll(".m-line")];
-    const home = lines[0];
-    const away = lines[1];
-    if (!home || !away) return;
-
-    const minute = textOf(liveItem.querySelector(".m-when .big")) || "CANLI";
-    const stage = textOf(liveItem.querySelector(".m-tag"));
-    const goals = liveItem.querySelector(".m-goals")?.cloneNode(true);
-
-    const headTitle = card.querySelector("h2");
-    const note = card.querySelector(".card-note");
-    if (headTitle) headTitle.textContent = "Canlı Maç";
-    if (note) note.innerHTML = `<span class="live-txt">${minute}</span>`;
-
-    const body = card.querySelector(".next-body");
-    if (!body) return;
-
-    body.innerHTML = `
-      <div class="live-card-badge"><span class="live-dot"></span> CANLI</div>
-      <div class="next-line live-card-line">
-        <div class="next-team">${cloneFlag(home).outerHTML}<span>${teamName(home)}</span></div>
-        <span class="live-score">${teamScore(home)}–${teamScore(away)}</span>
-        <div class="next-team">${cloneFlag(away).outerHTML}<span>${teamName(away)}</span></div>
-      </div>
-      <div class="next-sub">${stage}</div>
-      ${goals ? goals.outerHTML : ""}
-    `;
-    card.classList.add("live-match-card");
-  }
-
-  function currentTournamentScorers() {
-    const cards = [...app.querySelectorAll(".grid.cards-4 > .card")];
-    const scorersCard = cards.find((card) => textOf(card.querySelector("h2")) === "Gol Krallığı");
-    if (!scorersCard) return new Map();
-
+  function currentGoals() {
+    const scorers = directCards().find((card) => cardTitle(card) === "Gol Krallığı");
     const map = new Map();
-    scorersCard.querySelectorAll(".list-pad > .s-row").forEach((row) => {
-      const rawName = textOf(row.querySelector(".nm"));
-      const small = textOf(row.querySelector(".nm small"));
-      const player = rawName.replace(small, "").trim();
-      const goals = Number(textOf(row.querySelector(".g")).replace(/[^0-9]/g, ""));
-      if (player && Number.isFinite(goals)) {
-        map.set(normalizeName(player), goals);
-      }
+    if (!scorers) return map;
+    scorers.querySelectorAll(":scope > .list-pad > .s-row").forEach((row) => {
+      const nameNode = row.querySelector(".nm");
+      const small = txt(nameNode?.querySelector("small"));
+      const name = txt(nameNode).replace(small, "").trim();
+      const goals = Number(txt(row.querySelector(".g")).replace(/[^0-9]/g, ""));
+      if (name && Number.isFinite(goals)) map.set(norm(name), goals);
     });
     return map;
   }
 
-  function liveAwareAllTimeScorers() {
-    const current = currentTournamentScorers();
-    return baseWorldCupGoals
-      .map(([player, country, baseGoals]) => {
-        const currentGoals = current.get(normalizeName(player)) ?? 0;
-        return { player, country, baseGoals, currentGoals, total: baseGoals + currentGoals };
-      })
-      .sort((a, b) => b.total - a.total || b.currentGoals - a.currentGoals || a.player.localeCompare(b.player, "tr-TR"))
-      .slice(0, 5);
+  function rows() {
+    const live = currentGoals();
+    return base.map(([player, country, oldGoals]) => {
+      const add = live.get(norm(player)) ?? 0;
+      return { player, country, oldGoals, add, total: oldGoals + add };
+    }).sort((a, b) => b.total - a.total || b.add - a.add || a.player.localeCompare(b.player, "tr-TR")).slice(0, 5);
   }
 
-  function allTimeCardMarkup() {
-    const rows = liveAwareAllTimeScorers();
+  function allTimeMarkup() {
     return `<article class="card all-time-card">
-      <div class="card-head">
-        <h2>DK Tüm Zamanlar</h2>
-        <span class="card-note">2026 dahil</span>
-      </div>
+      <div class="card-head"><h2>DK Tüm Zamanlar</h2><span class="card-note">2026 dahil</span></div>
       <div class="list-pad all-time-card-body">
-        ${rows
-          .map(
-            (row, index) => `<div class="s-row all-time-row">
-              <span class="rk">${index + 1}</span>
-              <span class="all-time-medal">★</span>
-              <span class="nm">${row.player}<small>${row.country}${row.currentGoals ? ` · 2026: +${row.currentGoals}` : ""}</small></span>
-              <span class="g">${row.total}</span>
-            </div>`
-          )
-          .join("")}
+        ${rows().map((r, i) => `<div class="s-row all-time-row">
+          <span class="rk">${i + 1}</span><span class="all-time-medal">★</span>
+          <span class="nm">${r.player}<small>${r.country}${r.add ? ` · 2026: +${r.add}` : ""}</small></span>
+          <span class="g">${r.total}</span>
+        </div>`).join("")}
       </div>
     </article>`;
   }
 
-  function addOrUpdateAllTimeScorersCard() {
-    const cardsGrid = app.querySelector(".grid.cards-4");
-    if (!cardsGrid) return;
-
-    const existing = cardsGrid.querySelector(".all-time-card");
-    const markup = allTimeCardMarkup();
-    if (existing) {
-      existing.outerHTML = markup;
-      return;
-    }
-
-    const scorersCard = [...cardsGrid.querySelectorAll(".card")].find(
-      (card) => textOf(card.querySelector("h2")) === "Gol Krallığı"
-    );
-    if (scorersCard) {
-      scorersCard.insertAdjacentHTML("afterend", markup);
-    } else {
-      cardsGrid.insertAdjacentHTML("beforeend", markup);
-    }
+  function cloneFlag(teamLine) { return teamLine?.querySelector(".flag")?.cloneNode(true) ?? document.createElement("span"); }
+  function setLiveCard() {
+    const matchCard = directCards().find((card) => ["Sıradaki Maç", "Canlı Maç"].includes(cardTitle(card)));
+    const liveItem = app.querySelector("#maclar .m-item.live-m");
+    if (!matchCard || !liveItem) return;
+    const lines = [...liveItem.querySelectorAll(".m-line")];
+    const home = lines[0]; const away = lines[1];
+    const body = matchCard.querySelector(".next-body");
+    if (!home || !away || !body) return;
+    const title = matchCard.querySelector(":scope > .card-head h2");
+    const note = matchCard.querySelector(":scope > .card-head .card-note");
+    if (title) title.textContent = "Canlı Maç";
+    if (note) note.innerHTML = `<span class="live-txt">${txt(liveItem.querySelector(".m-when .big")) || "CANLI"}</span>`;
+    body.innerHTML = `<div class="live-card-badge"><span class="live-dot"></span> CANLI</div>
+      <div class="next-line live-card-line">
+        <div class="next-team">${cloneFlag(home).outerHTML}<span>${txt(home.querySelector(".nm"))}</span></div>
+        <span class="live-score">${txt(home.querySelector(".g")) || "-"}–${txt(away.querySelector(".g")) || "-"}</span>
+        <div class="next-team">${cloneFlag(away).outerHTML}<span>${txt(away.querySelector(".nm"))}</span></div>
+      </div>
+      <div class="next-sub">${txt(liveItem.querySelector(".m-tag"))}</div>
+      ${liveItem.querySelector(".m-goals")?.outerHTML ?? ""}`;
+    matchCard.classList.add("live-match-card");
   }
 
-  function removeEmbeddedAllTime() {
-    app.querySelectorAll(".all-time-scorers").forEach((node) => node.remove());
-  }
-
-  function enhance() {
+  function apply() {
     if (applying) return;
     applying = true;
     try {
       document.body.classList.add("wc26-polished");
-      const card = findMatchCard();
-      const liveItem = findLiveMatchItem();
-      if (card && liveItem) setLiveCard(card, liveItem);
-      removeEmbeddedAllTime();
-      addOrUpdateAllTimeScorersCard();
-      app.querySelectorAll("#maclar .m-item").forEach((item) => {
-        item.classList.add("fixture-card");
-        item.classList.toggle("fixture-live-card", item.classList.contains("live-m"));
-      });
-    } finally {
-      applying = false;
-    }
+      const grid = directCardsGrid();
+      if (!grid) return;
+      app.querySelectorAll(".all-time-scorers").forEach((n) => n.remove());
+      grid.querySelectorAll(":scope > .all-time-card").forEach((n) => n.remove());
+      const scorers = directCards().find((card) => cardTitle(card) === "Gol Krallığı");
+      if (scorers) scorers.insertAdjacentHTML("afterend", allTimeMarkup());
+      setLiveCard();
+      app.querySelectorAll("#maclar .m-item").forEach((item) => item.classList.add("fixture-card"));
+    } finally { applying = false; }
   }
 
   const style = document.createElement("style");
   style.textContent = `
-    .wc26-polished .wrap { width: min(1500px, 100% - 36px); }
-    .wc26-polished .card { box-shadow: 0 12px 36px rgb(0 0 0 / 0.06); }
-    .wc26-polished .grid.cards-4 { grid-template-columns: 1.12fr .9fr .9fr .9fr .74fr; align-items: stretch; }
-    .wc26-polished .grid.main-2 { grid-template-columns: minmax(0,1.55fr) minmax(340px,.72fr); gap: 18px; }
-    .live-match-card { border-color: color-mix(in srgb, var(--live) 42%, var(--border)); box-shadow: 0 18px 54px rgb(255 78 69 / 0.08); }
-    .live-match-card .card-head h2::before { background: var(--live); animation: pulse 1.5s ease-out infinite; }
-    .live-card-badge { display:inline-flex; align-items:center; gap:8px; align-self:center; margin-bottom:12px; padding:6px 10px; border-radius:999px; background:var(--live-dim); color:var(--live); font-size:12px; font-weight:800; }
-    .live-card-line { align-items:center; gap:12px; }
-    .live-score { min-width:82px; text-align:center; color:var(--ink); font-family:var(--mono); font-size:clamp(28px,3.3vw,42px); font-weight:800; letter-spacing:-0.06em; line-height:1; }
-    .live-match-card .m-goals { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); display:grid; gap:6px; color:var(--muted); font-size:12px; }
-    .all-time-card .card-head h2::before { background:#d6a21a; }
-    .all-time-card-body { padding-top:10px; }
-    .all-time-row { background:color-mix(in srgb, var(--surface-2) 72%, transparent); border-radius:10px; }
-    .all-time-medal { width:28px; text-align:center; color:#d6a21a; font-size:13px; }
-    .all-time-card .s-row { min-height:50px; }
-    .all-time-card .nm { font-size:13px; }
-    .all-time-card .g { color:var(--accent); font-size:18px; }
-    .wc26-polished #yol { min-width:0; }
-    .wc26-polished #yol .bracket { min-height:560px; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x proximity; padding-bottom:12px; }
-    .wc26-polished #yol .round-col { min-width:238px; scroll-snap-align:start; }
-    .wc26-polished #yol .tie { border-radius:12px; box-shadow:0 8px 20px rgb(0 0 0 / 0.04); }
-    .wc26-polished #maclar { position:sticky; top:70px; max-height:calc(100dvh - 88px); display:flex; flex-direction:column; }
-    .wc26-polished #maclar .match-list { overflow:auto; padding:0 12px 12px; }
-    .wc26-polished #maclar .fixture-card { display:grid; grid-template-columns:52px minmax(0,1fr) auto; align-items:center; gap:12px; margin-top:10px; border:1px solid var(--border); border-radius:14px; background:var(--surface); overflow:hidden; }
-    .wc26-polished #maclar .fixture-live-card { grid-template-columns:1fr; padding:14px; border-color:color-mix(in srgb, var(--live) 55%, var(--border)); }
-    .wc26-polished #maclar .fixture-live-card .m-when { justify-self:center; width:auto; min-width:72px; padding:5px 12px; border-radius:999px; background:var(--live); color:#fff; font-weight:800; }
-    .wc26-polished #maclar .fixture-live-card .m-teams { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-    .wc26-polished #maclar .fixture-live-card .m-line { display:grid; justify-items:center; gap:7px; padding:10px; border-radius:12px; background:var(--surface-2); }
-    .wc26-polished #maclar .fixture-live-card .m-line .g { font-family:var(--mono); font-size:30px; line-height:1; color:var(--ink); }
-    .wc26-polished #maclar .fixture-live-card .m-tag { justify-self:center; text-align:center; color:var(--muted); }
-    @media (max-width:1320px){ .wc26-polished .grid.cards-4{grid-template-columns:repeat(3,minmax(0,1fr));} }
-    @media (max-width:980px){ .wc26-polished .grid.cards-4{grid-template-columns:repeat(2,minmax(0,1fr));} .wc26-polished .grid.main-2{grid-template-columns:1fr;} .wc26-polished #maclar{position:static;max-height:none;} }
-    @media (max-width:720px){ .wc26-polished .wrap{width:min(100% - 22px,1500px);} .wc26-polished .grid.cards-4{grid-template-columns:1fr;} .wc26-polished #yol .bracket{min-height:0;display:flex;gap:12px;padding:12px;} .wc26-polished #yol .round-col{min-width:min(82vw,320px);border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface-2);} .wc26-polished #maclar .fixture-card{grid-template-columns:46px minmax(0,1fr);} .wc26-polished #maclar .fixture-card .m-tag{grid-column:1/-1;padding:0 12px 10px;} }
+    .wc26-polished .wrap{width:min(1500px,100% - 36px)}
+    .wc26-polished .grid.cards-4{grid-template-columns:1.08fr .88fr .82fr .88fr .72fr;align-items:stretch}
+    .wc26-polished .card{box-shadow:0 12px 36px rgb(0 0 0/.06)}
+    .all-time-card .card-head h2::before{background:#d6a21a}.all-time-medal{width:28px;text-align:center;color:#d6a21a}.all-time-row{border-radius:10px;background:color-mix(in srgb,var(--surface-2) 72%,transparent)}.all-time-card .s-row{min-height:50px}.all-time-card .nm{font-size:13px}.all-time-card .g{color:var(--accent);font-size:18px}
+    .live-match-card{border-color:color-mix(in srgb,var(--live) 42%,var(--border));box-shadow:0 18px 54px rgb(255 78 69/.08)}.live-match-card .card-head h2::before{background:var(--live);animation:pulse 1.5s ease-out infinite}.live-card-badge{display:inline-flex;align-items:center;gap:8px;align-self:center;margin-bottom:12px;padding:6px 10px;border-radius:999px;background:var(--live-dim);color:var(--live);font-size:12px;font-weight:800}.live-card-line{align-items:center;gap:12px}.live-score{min-width:82px;text-align:center;color:var(--ink);font-family:var(--mono);font-size:clamp(28px,3.3vw,42px);font-weight:800;letter-spacing:-.06em;line-height:1}.live-match-card .m-goals{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:grid;gap:6px;color:var(--muted);font-size:12px}
+    @media(max-width:1320px){.wc26-polished .grid.cards-4{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:980px){.wc26-polished .grid.cards-4{grid-template-columns:repeat(2,minmax(0,1fr))}.wc26-polished .grid.main-2{grid-template-columns:1fr}.wc26-polished #maclar{position:static;max-height:none}}
+    @media(max-width:720px){.wc26-polished .wrap{width:min(100% - 22px,1500px)}.wc26-polished .grid.cards-4{grid-template-columns:1fr}}
   `;
   document.head.appendChild(style);
 
-  enhance();
-  const observer = new MutationObserver(() => requestAnimationFrame(enhance));
-  observer.observe(app, { childList: true, subtree: true });
+  apply();
+  new MutationObserver(() => requestAnimationFrame(apply)).observe(app,{childList:true,subtree:true});
 })();
